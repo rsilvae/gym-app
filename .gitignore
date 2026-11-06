@@ -1,0 +1,19 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (¡nunca subir claves!)
+.env
+.env.*
+!.env.example
+
+# Builds y caches
+dist/
+build/
+.expo/
+web-build/
+coverage/
+
+# Sistema / editor
+.DS_Store
+Thumbs.db
+*.log
