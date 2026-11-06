@@ -3,12 +3,11 @@ import { useReducer } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
-import { EmptyState } from '@/components/empty-state';
+import { ErrorView, LoadingView } from '@/components/query-status';
 import { SetRow, SetRowHeader } from '@/components/set-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useRoutines } from '@/context/routines-context';
 import {
   createWorkoutState,
   getProgress,
@@ -16,6 +15,7 @@ import {
   type ActiveExercise,
 } from '@/features/workout/workout-reducer';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
+import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
 import type { Routine } from '@/types';
 
@@ -27,12 +27,10 @@ import type { Routine } from '@/types';
  */
 export default function WorkoutScreen() {
   const { routineId } = useLocalSearchParams<{ routineId: string }>();
-  const { getRoutine } = useRoutines();
-  const routine = getRoutine(routineId);
+  const { data: routine, isPending, error, refetch } = useRoutineQuery(routineId);
 
-  if (!routine) {
-    return <EmptyState title="No encontrada" message="Esta rutina no existe." />;
-  }
+  if (isPending) return <LoadingView />;
+  if (error) return <ErrorView error={error} onRetry={refetch} />;
 
   return <ActiveWorkout routine={routine} />;
 }

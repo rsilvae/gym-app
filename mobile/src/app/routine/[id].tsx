@@ -2,25 +2,24 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { Alert, FlatList, Pressable, StyleSheet } from 'react-native';
 
 import { Button } from '@/components/button';
-import { EmptyState } from '@/components/empty-state';
+import { ErrorView, LoadingView } from '@/components/query-status';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useRoutines } from '@/context/routines-context';
+import { useDeleteRoutine, useRoutineQuery } from '@/hooks/use-routines';
 import type { RoutineExercise } from '@/types';
 
 /**
  * Detalle de una rutina. El [id] del nombre del archivo es un parámetro:
- * al abrir /routine/2, `id` vale "2".
+ * al abrir /routine/abc123, `id` vale "abc123".
  */
 export default function RoutineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { getRoutine, deleteRoutine } = useRoutines();
-  const routine = getRoutine(id);
+  const { data: routine, isPending, error, refetch } = useRoutineQuery(id);
+  const deleteRoutine = useDeleteRoutine();
 
-  if (!routine) {
-    return <EmptyState title="No encontrada" message="Esta rutina no existe." />;
-  }
+  if (isPending) return <LoadingView />;
+  if (error) return <ErrorView error={error} onRetry={refetch} />;
 
   function confirmDelete() {
     Alert.alert('Eliminar rutina', `¿Seguro que quieres eliminar "${routine?.name}"?`, [
@@ -28,12 +27,11 @@ export default function RoutineDetailScreen() {
       {
         text: 'Eliminar',
         style: 'destructive',
-        onPress: () => {
-          // Primero volvemos a la lista y después borramos,
-          // para no mostrar un instante la pantalla "No encontrada".
-          router.back();
-          deleteRoutine(id);
-        },
+        onPress: () =>
+          deleteRoutine.mutate(id, {
+            onSuccess: () => router.back(),
+            onError: (err) => Alert.alert('No se pudo eliminar', err.message),
+          }),
       },
     ]);
   }
@@ -67,7 +65,12 @@ export default function RoutineDetailScreen() {
           />
         }
         ListFooterComponent={
-          <Button title="Eliminar rutina" variant="danger" onPress={confirmDelete} />
+          <Button
+            title={deleteRoutine.isPending ? 'Eliminando...' : 'Eliminar rutina'}
+            variant="danger"
+            disabled={deleteRoutine.isPending}
+            onPress={confirmDelete}
+          />
         }
         contentContainerStyle={styles.list}
         contentInsetAdjustmentBehavior="automatic"

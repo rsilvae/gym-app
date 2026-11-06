@@ -1,11 +1,23 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import { useColorScheme } from 'react-native';
 
-import { RoutinesProvider } from '@/context/routines-context';
+/**
+ * QueryClient: guarda la caché de TanStack Query (los datos que llegan de la API).
+ * Se crea una sola vez, fuera del componente.
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1, // si una petición falla, reintenta una vez antes de mostrar el error
+      staleTime: 30_000, // durante 30 s los datos se consideran frescos y no se vuelven a pedir
+    },
+  },
+});
 
 /**
  * Layout raíz: envuelve toda la app.
- * - RoutinesProvider comparte la lista de rutinas con todas las pantallas.
+ * - QueryClientProvider hace que todas las pantallas puedan usar los hooks de la API.
  * - Stack apila pantallas una sobre otra:
  *    "(tabs)"              → el grupo con las pestañas de abajo
  *    "routine/[id]"        → detalle de una rutina
@@ -17,8 +29,8 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <RoutinesProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="routine/[id]" options={{ title: 'Rutina', headerBackTitle: 'Rutinas' }} />
@@ -30,7 +42,7 @@ export default function RootLayout() {
             options={{ title: 'Entrenamiento', gestureEnabled: false, headerBackVisible: false }}
           />
         </Stack>
-      </RoutinesProvider>
-    </ThemeProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 }

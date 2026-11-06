@@ -26,6 +26,10 @@ type Props = {
   initialRoutine?: Routine;
   submitLabel: string;
   onSubmit: (input: RoutineInput) => void;
+  /** true mientras se envía a la API: desactiva el botón para no guardar dos veces. */
+  isSubmitting?: boolean;
+  /** Mensaje de error que devolvió la API, si lo hubo. */
+  submitError?: string | null;
 };
 
 function emptyExercise(): ExerciseDraft {
@@ -67,7 +71,13 @@ function validate(name: string, exercises: ExerciseDraft[]): string | null {
   return null;
 }
 
-export function RoutineForm({ initialRoutine, submitLabel, onSubmit }: Props) {
+export function RoutineForm({
+  initialRoutine,
+  submitLabel,
+  onSubmit,
+  isSubmitting = false,
+  submitError = null,
+}: Props) {
   const [name, setName] = useState(initialRoutine?.name ?? '');
   const [exercises, setExercises] = useState<ExerciseDraft[]>(() => toDraft(initialRoutine));
   const [error, setError] = useState<string | null>(null);
@@ -203,13 +213,17 @@ export function RoutineForm({ initialRoutine, submitLabel, onSubmit }: Props) {
 
       <Button title="+ Agregar ejercicio" variant="secondary" onPress={addExercise} />
 
-      {error && (
+      {(error ?? submitError) && (
         <ThemedText type="small" style={styles.error}>
-          {error}
+          {error ?? submitError}
         </ThemedText>
       )}
 
-      <Button title={submitLabel} onPress={handleSubmit} />
+      <Button
+        title={isSubmitting ? 'Guardando...' : submitLabel}
+        disabled={isSubmitting}
+        onPress={handleSubmit}
+      />
     </ScrollView>
   );
 }

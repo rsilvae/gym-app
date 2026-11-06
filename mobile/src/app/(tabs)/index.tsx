@@ -1,17 +1,31 @@
 import { router } from 'expo-router';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
+import { ErrorView, LoadingView } from '@/components/query-status';
 import { RoutineCard } from '@/components/routine-card';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, Spacing } from '@/constants/theme';
-import { useRoutines } from '@/context/routines-context';
+import { useRoutinesQuery } from '@/hooks/use-routines';
+import { useTheme } from '@/hooks/use-theme';
 
-/** Pestaña "Rutinas": lista de todas tus rutinas. */
+/** Pestaña "Rutinas": lista de todas tus rutinas, pedidas a la API. */
 export default function RoutinesScreen() {
-  const { routines } = useRoutines();
+  const theme = useTheme();
+  // data = las rutinas; isPending = cargando por primera vez; refetch = volver a pedir
+  const { data: routines, isPending, error, refetch, isRefetching } = useRoutinesQuery();
+
+  const header = (
+    <View style={styles.header}>
+      <ThemedText type="subtitle">Mis rutinas</ThemedText>
+      <Button title="+ Nueva" compact onPress={() => router.push('/routine/new')} />
+    </View>
+  );
+
+  if (isPending) return <LoadingView />;
+  if (error) return <ErrorView error={error} onRetry={refetch} />;
 
   return (
     <ThemedView style={styles.container}>
@@ -20,16 +34,19 @@ export default function RoutinesScreen() {
           data={routines}
           keyExtractor={(routine) => routine.id}
           renderItem={({ item }) => <RoutineCard routine={item} />}
-          ListHeaderComponent={
-            <View style={styles.header}>
-              <ThemedText type="subtitle">Mis rutinas</ThemedText>
-              <Button title="+ Nueva" compact onPress={() => router.push('/routine/new')} />
-            </View>
-          }
+          ListHeaderComponent={header}
           ListEmptyComponent={
             <ThemedText themeColor="textSecondary">
               No tienes rutinas. Toca &quot;+ Nueva&quot; para crear la primera.
             </ThemedText>
+          }
+          // Desliza hacia abajo para recargar
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefetching}
+              onRefresh={() => void refetch()}
+              tintColor={theme.primary}
+            />
           }
           contentContainerStyle={styles.list}
         />
