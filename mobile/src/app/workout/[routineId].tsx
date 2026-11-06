@@ -1,9 +1,11 @@
+import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useReducer } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { ErrorView, LoadingView } from '@/components/query-status';
+import { RestTimerBar } from '@/components/rest-timer-bar';
 import { SetRow, SetRowHeader } from '@/components/set-row';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -16,6 +18,7 @@ import {
   type ActiveExercise,
 } from '@/features/workout/workout-reducer';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
+import { MAX_REST_SECONDS, MIN_REST_SECONDS, useRestTimer } from '@/hooks/use-rest-timer';
 import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
 import { useLastPerformanceQuery, useSaveWorkout } from '@/hooks/use-workouts';
@@ -45,6 +48,7 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
   const elapsed = useElapsedTime(state.startedAt);
   const { completed, total } = getProgress(state);
   const progress = total > 0 ? completed / total : 0;
+  const restTimer = useRestTimer(90);
 
   const saveWorkout = useSaveWorkout();
   // "La última vez" de cada ejercicio de la rutina (si ya los hiciste antes)
@@ -93,6 +97,15 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
     ]);
   }
 
+  /** Marca o desmarca una serie. Al marcarla como hecha, empieza el descanso. */
+  function toggleSet(exercise: ActiveExercise, setId: string, wasCompleted: boolean) {
+    dispatch({ type: 'TOGGLE_SET', exerciseId: exercise.id, setId });
+    if (!wasCompleted) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      restTimer.start();
+    }
+  }
+
   function confirmRemoveSet(exercise: ActiveExercise, setId: string, number: number) {
     Alert.alert('Quitar serie', `¿Quitar la serie ${number} de ${exercise.name}?`, [
       { text: 'Cancelar', style: 'cancel' },
@@ -125,7 +138,8 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
       />
 
       <ScrollView
-        contentContainerStyle={styles.content}
+        // Con el descanso en pantalla, dejamos espacio abajo para que la barra no tape el último botón
+        contentContainerStyle={[styles.content, restTimer.isRunning && styles.contentWithTimer]}
         contentInsetAdjustmentBehavior="automatic"
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled">
@@ -154,6 +168,34 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
                 { width: `${progress * 100}%`, backgroundColor: theme.primary },
               ]}
             />
+          </View>
+
+          {/* Duración del descanso que empieza al marcar cada serie */}
+          <View style={styles.restRow}>
+            <ThemedText type="small" themeColor="textSecondary">
+              Descanso entre series
+            </ThemedText>
+            <View style={styles.restControls}>
+              <Button
+                title="−"
+                variant="secondary"
+                compact
+                accessibilityLabel="Bajar 15 segundos de descanso"
+                disabled={restTimer.restSeconds <= MIN_REST_SECONDS}
+                onPress={() => restTimer.adjust(-15)}
+              />
+              <ThemedText type="smallBold" style={styles.restValue}>
+                {formatDuration(restTimer.restSeconds * 1000)}
+              </ThemedText>
+              <Button
+                title="+"
+                variant="secondary"
+                compact
+                accessibilityLabel="Subir 15 segundos de descanso"
+                disabled={restTimer.restSeconds >= MAX_REST_SECONDS}
+                onPress={() => restTimer.adjust(15)}
+              />
+            </View>
           </View>
         </ThemedView>
 
@@ -185,7 +227,7 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
                   onChangeReps={(value) =>
                     dispatch({ type: 'UPDATE_SET', exerciseId: exercise.id, setId: set.id, field: 'reps', value })
                   }
-                  onToggle={() => dispatch({ type: 'TOGGLE_SET', exerciseId: exercise.id, setId: set.id })}
+                  onToggle={() => toggleSet(exercise, set.id, set.completed)}
                   onLongPressNumber={() => confirmRemoveSet(exercise, set.id, index + 1)}
                 />
               ))}
@@ -210,6 +252,8 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
           onPress={confirmFinish}
         />
       </ScrollView>
+
+      <RestTimerBar timer={restTimer} />
     </ThemedView>
   );
 }
@@ -222,6 +266,25 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: Spacing.three,
     paddingBottom: Spacing.six,
+  },
+  contentWithTimer: {
+    paddingBottom: 160,
+  },
+  restRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: Spacing.one,
+  },
+  restControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  restValue: {
+    minWidth: 48,
+    textAlign: 'center',
+    fontVariant: ['tabular-nums'],
   },
   headerAction: {
     fontSize: 16,
