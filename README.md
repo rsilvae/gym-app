@@ -18,7 +18,7 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 |---|---|
 | Móvil (`mobile/`) | React Native, Expo (SDK 58), Expo Router, TypeScript, TanStack Query, SecureStore |
 | Backend (`api/`) | Node.js, Express 5, TypeScript, PostgreSQL, Prisma 7, JWT, bcrypt, Zod |
-| Calidad / Infra | Vitest, Supertest, GitHub Actions, Render, Neon |
+| Calidad / Infra | Vitest, Supertest, GitHub Actions, Render, Neon, EAS Update |
 
 ## Arquitectura
 
@@ -28,6 +28,20 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 
 - La app nunca habla directo con la base: todo pasa por la API, que valida los datos (Zod) y verifica el token en cada petición.
 - Cada consulta filtra por el usuario del token: nadie puede ver ni modificar datos de otro (cubierto por tests).
+
+## Probar la app
+
+La app está publicada con **EAS Update**. Instala **Expo Go** (SDK 58) y escanea este código con la cámara del celular:
+
+<img src="docs/expo-go-qr.png" alt="QR para abrir Gym App en Expo Go" width="180">
+
+O abre este link desde el celular: `exp://u.expo.dev/7a572ab6-6d4f-40bd-b6f2-767e825518b3?channel-name=main&runtime-version=exposdk:58.0.0`
+
+Para publicar una nueva versión (desde `mobile/`):
+
+```bash
+npx eas-cli@latest update --channel main --message "Qué cambió" --environment production
+```
 
 ## Cómo correrlo en local
 
@@ -82,4 +96,9 @@ Se configura con [`render.yaml`](render.yaml): en cada push a `main` se compila,
 - [x] Fase 6 – Login con JWT
 - [x] Fase 7 – Historial de entrenamientos
 - [x] Fase 8 – Tests, CI y deploy
-- [ ] Fase 9 – Mejoras: temporizador de descanso, gráficos de progreso, build instalable (EAS)
+- [ ] Fase 9 – Mejoras
+  - [x] Publicar la app con EAS Update (abrirla sin la PC)
+  - [ ] Temporizador de descanso
+  - [ ] Guardar el entrenamiento en curso
+  - [ ] Gráficos de progreso
+  - [ ] Build instalable (EAS Build)

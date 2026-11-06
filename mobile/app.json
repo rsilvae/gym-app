@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "mobile",
+    "name": "Gym App",
     "slug": "mobile",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -38,6 +38,21 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "7a572ab6-6d4f-40bd-b6f2-767e825518b3"
+      }
+    },
+    "owner": "fitosilvae",
+    "updates": {
+      "url": "https://u.expo.dev/7a572ab6-6d4f-40bd-b6f2-767e825518b3"
+    },
+    "runtimeVersion": "exposdk:58.0.0"
   }
 }

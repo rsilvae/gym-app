@@ -1,16 +1,23 @@
 import Constants from 'expo-constants';
 
+/** API publicada en Render (Fase 8). */
+const PRODUCTION_API_URL = 'https://gym-api-cc6g.onrender.com';
+
 /**
  * ¿A qué dirección le habla la app?
  *
- * 1. Si existe EXPO_PUBLIC_API_URL (en mobile/.env), se usa esa. Sirve para producción (Fase 8).
- * 2. Si no, en desarrollo se usa la IP de tu PC: la misma de donde el celular descarga
+ * 1. Si existe EXPO_PUBLIC_API_URL (en mobile/.env o en el entorno de EAS), se usa esa.
+ * 2. Si la app no está en modo desarrollo (por ejemplo, una actualización publicada con
+ *    `eas update`), se usa la API publicada.
+ * 3. Si no, en desarrollo se usa la IP de tu PC: la misma de donde el celular descarga
  *    la app con Expo (ej: "192.168.1.7:8081"), pero con el puerto 3000 de la API.
  *    Así funciona en tu Wi-Fi sin configurar nada.
  */
 function getApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv.replace(/\/$/, '');
+
+  if (!__DEV__) return PRODUCTION_API_URL;
 
   const devHost = Constants.expoConfig?.hostUri?.split(':')[0];
   return `http://${devHost ?? 'localhost'}:3000`;
