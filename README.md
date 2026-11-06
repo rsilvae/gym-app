@@ -27,7 +27,7 @@ Escanea el código QR con **Expo Go** en tu celular.
 - [x] Fase 0 – Proyecto base
 - [x] Fase 1 – Pantallas y navegación
 - [x] Fase 2 – Crear y editar rutinas
-- [ ] Fase 3 – Entrenamiento en curso con checks
+- [x] Fase 3 – Entrenamiento en curso con checks
 - [ ] Fase 4 – API con Express + PostgreSQL
 - [ ] Fase 5 – Conectar app y API
 - [ ] Fase 6 – Login con JWT

@@ -59,6 +59,13 @@ export default function RoutineDetailScreen() {
         data={routine.exercises}
         keyExtractor={(exercise) => exercise.id}
         renderItem={({ item, index }) => <ExerciseRow exercise={item} position={index + 1} />}
+        ListHeaderComponent={
+          <Button
+            title="Empezar entrenamiento"
+            disabled={routine.exercises.length === 0}
+            onPress={() => router.push({ pathname: '/workout/[routineId]', params: { routineId: id } })}
+          />
+        }
         ListFooterComponent={
           <Button title="Eliminar rutina" variant="danger" onPress={confirmDelete} />
         }
