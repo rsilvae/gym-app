@@ -1,77 +1,226 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { app, createUser, prisma, request, resetDatabase } from './helpers.ts';
+import { createApp } from '../src/app.ts';
+import { app, createUser, lastCodeFor, outbox, prisma, request, resetDatabase } from './helpers.ts';
 
 beforeEach(resetDatabase);
 afterAll(() => prisma.$disconnect());
 
+const newAccount = { email: 'Ana@Test.com', username: 'Ana_Fit', password: 'secreta123' };
+
+/** Retrocede el envío del último código, como si hubiera pasado más de un minuto. */
+async function skipResendCooldown() {
+  await prisma.emailCode.updateMany({ data: { createdAt: new Date(Date.now() - 2 * 60_000) } });
+}
+
 describe('GET /health', () => {
-  it('responde ok', async () => {
+  it('responde ok, con headers de seguridad (helmet)', async () => {
     const response = await request(app).get('/health');
     expect(response.status).toBe(200);
     expect(response.body).toEqual({ status: 'ok' });
+    expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers).not.toHaveProperty('x-powered-by');
   });
 });
 
 describe('POST /auth/register', () => {
-  it('crea la cuenta y devuelve un token, sin la contraseña', async () => {
-    const response = await request(app)
-      .post('/auth/register')
-      .send({ email: 'Ana@Test.com', password: 'secreta123' });
+  it('crea la cuenta sin verificar y envía un código, sin devolver token', async () => {
+    const response = await request(app).post('/auth/register').send(newAccount);
 
-    expect(response.status).toBe(201);
-    expect(response.body.token).toEqual(expect.any(String));
-    expect(response.body.user.email).toBe('ana@test.com'); // se guarda en minúsculas
-    expect(response.body.user).not.toHaveProperty('passwordHash');
-  });
+    expect(response.status).toBe(202);
+    expect(response.body).not.toHaveProperty('token');
+    expect(response.body.email).toBe('ana@test.com');
 
-  it('guarda la contraseña hasheada, nunca en texto plano', async () => {
-    await createUser('ana@test.com', 'secreta123');
     const user = await prisma.user.findUniqueOrThrow({ where: { email: 'ana@test.com' } });
-    expect(user.passwordHash).not.toBe('secreta123');
-    expect(user.passwordHash).toMatch(/^\$2[aby]\$/); // formato de bcrypt
+    expect(user.username).toBe('ana_fit'); // email y usuario se guardan en minúsculas
+    expect(user.emailVerifiedAt).toBeNull();
+    expect(lastCodeFor('ana@test.com')).toMatch(/^\d{6}$/);
   });
 
-  it('rechaza un email repetido con 409', async () => {
-    await createUser('ana@test.com');
+  it('guarda la contraseña y el código hasheados, nunca en texto plano', async () => {
+    await request(app).post('/auth/register').send(newAccount);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'ana@test.com' } });
+    const code = await prisma.emailCode.findFirstOrThrow({ where: { userId: user.id } });
+
+    expect(user.passwordHash).toMatch(/^\$2[aby]\$/); // formato de bcrypt
+    expect(code.codeHash).not.toContain(lastCodeFor('ana@test.com'));
+  });
+
+  it('rechaza un nombre de usuario ocupado (sin importar mayúsculas) con 409', async () => {
+    await createUser('ana@test.com', 'secreta123', 'ana_fit');
     const response = await request(app)
       .post('/auth/register')
-      .send({ email: 'ANA@test.com', password: 'otra-clave-123' });
+      .send({ email: 'otra@test.com', username: 'ANA_FIT', password: 'otra-clave-123' });
     expect(response.status).toBe(409);
   });
 
-  it('valida email y largo de contraseña', async () => {
+  it('con un email ya registrado responde igual que siempre y avisa al dueño por email', async () => {
+    await createUser('ana@test.com');
+    outbox.length = 0;
+
     const response = await request(app)
       .post('/auth/register')
-      .send({ email: 'no-es-email', password: '123' });
+      .send({ email: 'ANA@test.com', username: 'impostor', password: 'otra-clave-123' });
+
+    // Misma respuesta que un registro nuevo: no se puede saber si el email existe
+    expect(response.status).toBe(202);
+    expect(await prisma.user.count()).toBe(1);
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].subject).toMatch(/ya tienes una cuenta/i);
+    expect(outbox[0].text).not.toMatch(/\d{6}/); // no lleva código
+  });
+
+  it('si el registro anterior no se verificó, lo reemplaza con los datos nuevos', async () => {
+    await request(app).post('/auth/register').send(newAccount);
+    await skipResendCooldown();
+    const response = await request(app)
+      .post('/auth/register')
+      .send({ ...newAccount, username: 'ana_nueva', password: 'clave-nueva-123' });
+
+    expect(response.status).toBe(202);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'ana@test.com' } });
+    expect(user.username).toBe('ana_nueva');
+  });
+
+  it('valida email, usuario y largo de contraseña', async () => {
+    const response = await request(app)
+      .post('/auth/register')
+      .send({ email: 'no-es-email', username: 'a b', password: '123' });
     expect(response.status).toBe(400);
     expect(response.body.details.fieldErrors).toHaveProperty('email');
+    expect(response.body.details.fieldErrors).toHaveProperty('username');
     expect(response.body.details.fieldErrors).toHaveProperty('password');
   });
 });
 
-describe('POST /auth/login', () => {
-  beforeEach(() => createUser('ana@test.com', 'secreta123'));
+describe('POST /auth/verify-email', () => {
+  beforeEach(() => request(app).post('/auth/register').send(newAccount));
 
-  it('inicia sesión con las credenciales correctas', async () => {
+  it('con el código correcto verifica la cuenta y devuelve el token', async () => {
     const response = await request(app)
-      .post('/auth/login')
-      .send({ email: 'ana@test.com', password: 'secreta123' });
+      .post('/auth/verify-email')
+      .send({ email: 'ana@test.com', code: lastCodeFor('ana@test.com') });
+
     expect(response.status).toBe(200);
     expect(response.body.token).toEqual(expect.any(String));
+    expect(response.body.user).toMatchObject({ email: 'ana@test.com', username: 'ana_fit' });
+    expect(response.body.user).not.toHaveProperty('passwordHash');
   });
 
-  it('da el mismo error con contraseña incorrecta o email inexistente', async () => {
+  it('el código sirve una sola vez', async () => {
+    const code = lastCodeFor('ana@test.com');
+    await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code });
+    const again = await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code });
+    expect(again.status).toBe(400);
+  });
+
+  it('rechaza un código incorrecto', async () => {
+    const code = lastCodeFor('ana@test.com');
+    const wrong = code === '000000' ? '111111' : '000000';
+    const response = await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code: wrong });
+    expect(response.status).toBe(400);
+  });
+
+  it('tras 5 intentos fallidos, ni el código correcto sirve', async () => {
+    const code = lastCodeFor('ana@test.com');
+    const wrong = code === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i++) {
+      await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code: wrong });
+    }
+    const response = await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code });
+    expect(response.status).toBe(400);
+  });
+
+  it('rechaza un código vencido', async () => {
+    await prisma.emailCode.updateMany({ data: { expiresAt: new Date(Date.now() - 1000) } });
+    const response = await request(app)
+      .post('/auth/verify-email')
+      .send({ email: 'ana@test.com', code: lastCodeFor('ana@test.com') });
+    expect(response.status).toBe(400);
+  });
+});
+
+describe('POST /auth/resend-code', () => {
+  beforeEach(() => request(app).post('/auth/register').send(newAccount));
+
+  it('envía un código nuevo (y el anterior deja de servir)', async () => {
+    const oldCode = lastCodeFor('ana@test.com');
+    await skipResendCooldown();
+
+    const response = await request(app).post('/auth/resend-code').send({ email: 'ana@test.com' });
+    expect(response.status).toBe(202);
+    const newCode = lastCodeFor('ana@test.com');
+
+    if (oldCode !== newCode) {
+      const withOld = await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code: oldCode });
+      expect(withOld.status).toBe(400);
+    }
+    const withNew = await request(app).post('/auth/verify-email').send({ email: 'ana@test.com', code: newCode });
+    expect(withNew.status).toBe(200);
+  });
+
+  it('no envía más de un código por minuto', async () => {
+    await request(app).post('/auth/resend-code').send({ email: 'ana@test.com' });
+    expect(outbox).toHaveLength(1); // solo el del registro
+  });
+
+  it('responde igual aunque el email no exista, sin enviar nada', async () => {
+    outbox.length = 0;
+    const response = await request(app).post('/auth/resend-code').send({ email: 'nadie@test.com' });
+    expect(response.status).toBe(202);
+    expect(outbox).toHaveLength(0);
+  });
+});
+
+describe('POST /auth/login', () => {
+  beforeEach(() => createUser('ana@test.com', 'secreta123', 'ana_fit'));
+
+  it('inicia sesión con el email o con el usuario (sin importar mayúsculas)', async () => {
+    const byEmail = await request(app).post('/auth/login').send({ identifier: 'ANA@test.com', password: 'secreta123' });
+    const byUsername = await request(app).post('/auth/login').send({ identifier: 'Ana_Fit', password: 'secreta123' });
+
+    expect(byEmail.status).toBe(200);
+    expect(byEmail.body.token).toEqual(expect.any(String));
+    expect(byUsername.status).toBe(200);
+    expect(byUsername.body.user.username).toBe('ana_fit');
+  });
+
+  it('da el mismo error con contraseña incorrecta o cuenta inexistente', async () => {
     const wrongPassword = await request(app)
       .post('/auth/login')
-      .send({ email: 'ana@test.com', password: 'incorrecta' });
-    const unknownEmail = await request(app)
-      .post('/auth/login')
-      .send({ email: 'nadie@test.com', password: 'incorrecta' });
+      .send({ identifier: 'ana@test.com', password: 'incorrecta' });
+    const unknownUser = await request(app).post('/auth/login').send({ identifier: 'nadie', password: 'incorrecta' });
 
     expect(wrongPassword.status).toBe(401);
-    expect(unknownEmail.status).toBe(401);
-    expect(wrongPassword.body.error).toBe(unknownEmail.body.error);
+    expect(unknownUser.status).toBe(401);
+    expect(wrongPassword.body.error).toBe(unknownUser.body.error);
+  });
+
+  it('si el email no está verificado, responde 403 y envía un código', async () => {
+    await request(app).post('/auth/register').send({ email: 'beto@test.com', username: 'beto', password: 'secreta123' });
+    await skipResendCooldown();
+    outbox.length = 0;
+
+    const response = await request(app).post('/auth/login').send({ identifier: 'beto', password: 'secreta123' });
+
+    expect(response.status).toBe(403);
+    expect(response.body.details).toEqual({ reason: 'EMAIL_NOT_VERIFIED', email: 'beto@test.com' });
+    expect(response.body).not.toHaveProperty('token');
+    expect(lastCodeFor('beto@test.com')).toMatch(/^\d{6}$/);
+  });
+});
+
+describe('Límite de intentos', () => {
+  it('después de 10 logins fallidos responde 429', async () => {
+    const limitedApp = createApp(); // con límites, como en producción
+    const attempt = () => request(limitedApp).post('/auth/login').send({ identifier: 'nadie', password: 'mala' });
+
+    for (let i = 0; i < 10; i++) {
+      expect((await attempt()).status).toBe(401);
+    }
+    const blocked = await attempt();
+    expect(blocked.status).toBe(429);
+    expect(blocked.body.error).toMatch(/demasiados intentos/i);
   });
 });
 
@@ -80,7 +229,7 @@ describe('GET /auth/me', () => {
     const { auth } = await createUser('ana@test.com');
     const response = await request(app).get('/auth/me').set(auth);
     expect(response.status).toBe(200);
-    expect(response.body.email).toBe('ana@test.com');
+    expect(response.body).toMatchObject({ email: 'ana@test.com', username: 'ana' });
   });
 
   it('rechaza peticiones sin token o con token inválido', async () => {

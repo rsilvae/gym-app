@@ -1,4 +1,4 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
+import { unverifiedEmailFrom } from '@/lib/auth-api';
+
+/** Mismas reglas que la API: 3 a 20 caracteres, letras minúsculas, números, _ o . */
+const USERNAME_REGEX = /^[a-z0-9_.]{3,20}$/;
 
 type Props = {
   mode: 'login' | 'register';
@@ -19,7 +23,9 @@ export function AuthForm({ mode }: Props) {
   const { signIn, signUp } = useAuth();
   const isRegister = mode === 'register';
 
+  // En el login, "email" es el email o el nombre de usuario
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +33,18 @@ export function AuthForm({ mode }: Props) {
 
   /** Validaciones rápidas antes de llamar a la API (la API vuelve a validar todo). */
   function validate(): string | null {
-    if (!email.trim()) return 'Escribe tu email.';
+    if (!email.trim()) return isRegister ? 'Escribe tu email.' : 'Escribe tu email o usuario.';
+    if (isRegister && !USERNAME_REGEX.test(username.trim().toLowerCase())) {
+      return 'El usuario debe tener de 3 a 20 caracteres: letras, números, _ o .';
+    }
     if (!password) return 'Escribe tu contraseña.';
     if (isRegister && password.length < 8) return 'La contraseña debe tener al menos 8 caracteres.';
     if (isRegister && password !== confirmPassword) return 'Las contraseñas no coinciden.';
     return null;
+  }
+
+  function goToVerify(emailToVerify: string) {
+    router.push({ pathname: '/verify-email', params: { email: emailToVerify } });
   }
 
   async function handleSubmit() {
@@ -41,12 +54,24 @@ export function AuthForm({ mode }: Props) {
 
     setIsSubmitting(true);
     try {
-      const credentials = { email: email.trim(), password };
-      await (isRegister ? signUp(credentials) : signIn(credentials));
-      // No navegamos a mano: al cambiar la sesión, el layout muestra la app sola.
+      if (isRegister) {
+        await signUp({ email: email.trim(), username: username.trim(), password });
+        // La cuenta se creó, pero falta confirmar el código que llegó por email
+        goToVerify(email.trim().toLowerCase());
+        setIsSubmitting(false);
+      } else {
+        await signIn({ identifier: email.trim(), password });
+        // No navegamos a mano: al cambiar la sesión, el layout muestra la app sola.
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Algo salió mal.');
       setIsSubmitting(false);
+      // Contraseña correcta, pero el email no está verificado: la API ya mandó un código
+      const unverifiedEmail = unverifiedEmailFrom(err);
+      if (unverifiedEmail) {
+        goToVerify(unverifiedEmail);
+        return;
+      }
+      setError(err instanceof Error ? err.message : 'Algo salió mal.');
     }
   }
 
@@ -69,16 +94,29 @@ export function AuthForm({ mode }: Props) {
 
           <ThemedView type="backgroundElement" style={styles.card}>
             <TextField
-              label="Email"
-              placeholder="tu@email.com"
+              label={isRegister ? 'Email' : 'Email o usuario'}
+              placeholder={isRegister ? 'tu@email.com' : 'tu@email.com o tu_usuario'}
               value={email}
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="email"
-              textContentType="emailAddress"
+              autoComplete={isRegister ? 'email' : 'username'}
+              textContentType={isRegister ? 'emailAddress' : 'username'}
             />
+            {isRegister && (
+              <TextField
+                label="Nombre de usuario"
+                placeholder="3 a 20: letras, números, _ o ."
+                value={username}
+                onChangeText={setUsername}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="username-new"
+                textContentType="username"
+                maxLength={20}
+              />
+            )}
             <TextField
               label="Contraseña"
               placeholder={isRegister ? 'Mínimo 8 caracteres' : ''}

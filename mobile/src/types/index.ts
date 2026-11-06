@@ -22,13 +22,20 @@ export type Routine = {
 export type User = {
   id: string;
   email: string;
+  username: string;
   createdAt: string;
 };
 
-/** Respuesta de /auth/login y /auth/register. */
+/** Respuesta de /auth/login y /auth/verify-email. */
 export type AuthResponse = {
   token: string;
   user: User;
+};
+
+/** Respuesta de /auth/register y /auth/resend-code: el código va por email. */
+export type CodeSentResponse = {
+  email: string;
+  message: string;
 };
 
 /** Los datos para crear o editar una rutina (todo menos el id, que se genera solo). */

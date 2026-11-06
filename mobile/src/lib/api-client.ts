@@ -30,6 +30,8 @@ export class ApiError extends Error {
   constructor(
     public readonly status: number,
     message: string,
+    /** Información extra que manda la API (ej: errores por campo, o por qué no se pudo entrar). */
+    public readonly details?: unknown,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -86,7 +88,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, body?.error ?? `Error ${response.status}`);
+    throw new ApiError(response.status, body?.error ?? `Error ${response.status}`, body?.details);
   }
   return body as T;
 }

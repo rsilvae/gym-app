@@ -6,7 +6,8 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 
 ## Funcionalidades
 
-- 🔐 Registro e inicio de sesión (JWT), con sesión guardada de forma segura en el celular
+- 🔐 Registro con nombre de usuario y verificación del email por código; inicio de sesión con email o usuario (JWT), con sesión guardada de forma segura en el celular
+- 🛡️ Límite de intentos, headers de seguridad y respuestas que no revelan qué emails están registrados
 - 📋 Crear, editar, reordenar y eliminar rutinas
 - ✅ Entrenamiento en curso: cronómetro, progreso y check por serie con peso y reps editables
 - 💾 El entrenamiento en curso se guarda en el celular: si la app se cierra, lo retomas donde quedaste

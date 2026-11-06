@@ -2,25 +2,48 @@ import request from 'supertest';
 
 import { createApp } from '../src/app.ts';
 import { prisma } from '../src/db.ts';
+import { setEmailSender, type Email } from '../src/utils/email.ts';
 
-/** La app de Express para los tests. Supertest la usa sin abrir un puerto. */
-export const app = createApp();
+/** La app de Express para los tests. Supertest la usa sin abrir un puerto. Sin límite de intentos. */
+export const app = createApp({ rateLimits: false });
+
+/** Emails "enviados" durante los tests: en vez de mandarlos, se guardan aquí. */
+export const outbox: Email[] = [];
+setEmailSender(async (email) => {
+  outbox.push(email);
+});
+
+/** El último código de 6 dígitos enviado a ese email. */
+export function lastCodeFor(email: string): string {
+  const message = outbox.findLast((item) => item.to === email && /\b\d{6}\b/.test(item.text));
+  const code = message?.text.match(/\b\d{6}\b/)?.[0];
+  if (!code) throw new Error(`No se envió ningún código a ${email}`);
+  return code;
+}
 
 /** Deja la base vacía. Se llama antes de cada test para que no dependan unos de otros. */
 export async function resetDatabase() {
+  outbox.length = 0;
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "WorkoutSet", "Workout", "RoutineExercise", "Routine", "User" CASCADE',
+    'TRUNCATE TABLE "EmailCode", "WorkoutSet", "Workout", "RoutineExercise", "Routine", "User" CASCADE',
   );
 }
 
-/** Crea un usuario y devuelve su token y el header listo para usar. */
-export async function createUser(email = 'ana@test.com', password = 'secreta123') {
-  const response = await request(app).post('/auth/register').send({ email, password });
-  if (response.status !== 201) {
-    throw new Error(`No se pudo crear el usuario de prueba: ${JSON.stringify(response.body)}`);
+/**
+ * Crea un usuario ya verificado (registro + código) y devuelve su token y el header listo para usar.
+ * El nombre de usuario sale del email: "ana@test.com" → "ana".
+ */
+export async function createUser(email = 'ana@test.com', password = 'secreta123', username = email.split('@')[0]) {
+  const registered = await request(app).post('/auth/register').send({ email, username, password });
+  if (registered.status !== 202) {
+    throw new Error(`No se pudo crear el usuario de prueba: ${JSON.stringify(registered.body)}`);
   }
-  const token: string = response.body.token;
-  return { token, user: response.body.user, auth: { Authorization: `Bearer ${token}` } };
+  const verified = await request(app).post('/auth/verify-email').send({ email, code: lastCodeFor(email) });
+  if (verified.status !== 200) {
+    throw new Error(`No se pudo verificar el usuario de prueba: ${JSON.stringify(verified.body)}`);
+  }
+  const token: string = verified.body.token;
+  return { token, user: verified.body.user, auth: { Authorization: `Bearer ${token}` } };
 }
 
 export const sampleRoutine = {

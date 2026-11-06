@@ -1,28 +1,42 @@
 import express from 'express';
+import helmet from 'helmet';
 
+import { env } from './env.ts';
 import { errorHandler, notFound } from './middleware/error-handler.ts';
+import { createAuthLimiters } from './middleware/rate-limit.ts';
 import { requireAuth } from './middleware/require-auth.ts';
-import { authRouter } from './routes/auth.ts';
+import { createAuthRouter } from './routes/auth.ts';
 import { exercisesRouter } from './routes/exercises.ts';
 import { routinesRouter } from './routes/routines.ts';
 import { workoutsRouter } from './routes/workouts.ts';
+
+type AppOptions = {
+  /** Límite de intentos en /auth. Los tests lo apagan (salvo el test que lo prueba). */
+  rateLimits?: boolean;
+};
 
 /**
  * Crea la app de Express (sin ponerla a escuchar).
  * Separarlo de index.ts permite usarla en los tests (Fase 8) sin abrir un puerto.
  */
-export function createApp() {
+export function createApp({ rateLimits = true }: AppOptions = {}) {
   const app = express();
 
-  // Convierte el body JSON de las peticiones en un objeto (req.body)
-  app.use(express.json());
+  // Detrás de un proxy (Render), la IP real del cliente viene en X-Forwarded-For
+  app.set('trust proxy', env.TRUST_PROXY);
+
+  // Headers de seguridad estándar (y quita "X-Powered-By: Express", que da pistas a atacantes)
+  app.use(helmet());
+
+  // Convierte el body JSON de las peticiones en un objeto (req.body). Máximo 100 KB.
+  app.use(express.json({ limit: '100kb' }));
 
   // Para comprobar que el servidor está vivo
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok' });
   });
 
-  app.use('/auth', authRouter);
+  app.use('/auth', createAuthRouter(createAuthLimiters(rateLimits)));
   // requireAuth va antes: todas las rutas de /routines necesitan login
   app.use('/routines', requireAuth, routinesRouter);
   app.use('/workouts', requireAuth, workoutsRouter);

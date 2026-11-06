@@ -13,12 +13,39 @@ datasource db {
 
 /// Un usuario de la app. Nunca guardamos la contraseña: solo su hash (bcrypt).
 model User {
-  id           String    @id @default(cuid())
-  email        String    @unique
-  passwordHash String
-  createdAt    DateTime  @default(now())
-  routines     Routine[]
-  workouts     Workout[]
+  id              String      @id @default(cuid())
+  email           String      @unique
+  /// Nombre de usuario, siempre en minúsculas (así "Ana" y "ana" son el mismo).
+  username        String      @unique
+  passwordHash    String
+  /// Cuándo confirmó su email con el código. null = todavía no puede entrar.
+  emailVerifiedAt DateTime?
+  createdAt       DateTime    @default(now())
+  routines        Routine[]
+  workouts        Workout[]
+  emailCodes      EmailCode[]
+}
+
+/// Para qué sirve un código enviado por email.
+enum EmailCodePurpose {
+  VERIFY_EMAIL
+}
+
+/// Código de 6 dígitos enviado por email. Se guarda solo su hash, como una contraseña.
+model EmailCode {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose   EmailCodePurpose
+  codeHash  String
+  expiresAt DateTime
+  /// Intentos fallidos: al llegar al máximo, el código deja de servir.
+  attempts  Int              @default(0)
+  /// Cuándo se envió (para no reenviar más de uno por minuto).
+  createdAt DateTime         @default(now())
+
+  /// Un solo código activo por usuario y propósito: uno nuevo reemplaza al anterior.
+  @@unique([userId, purpose])
 }
 
 /// Una rutina de entrenamiento (ej: "Pecho y tríceps"). Pertenece a un usuario.

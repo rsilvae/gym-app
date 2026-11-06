@@ -29,8 +29,10 @@ npm run dev               # http://localhost:3000
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health` | Estado del servidor |
-| POST | `/auth/register` | Crea una cuenta → `{ token, user }` |
-| POST | `/auth/login` | Inicia sesión → `{ token, user }` |
+| POST | `/auth/register` | Crea la cuenta (`email`, `username`, `password`) sin verificar y envía un código por email → 202 |
+| POST | `/auth/verify-email` | Confirma el código de 6 dígitos → `{ token, user }` |
+| POST | `/auth/resend-code` | Envía un código nuevo (máx. 1 por minuto) → 202 |
+| POST | `/auth/login` | Inicia sesión con email **o** usuario (`identifier`, `password`) → `{ token, user }`; 403 si falta verificar el email |
 | GET | `/auth/me` 🔒 | Usuario actual |
 | GET | `/routines` 🔒 | Lista tus rutinas |
 | GET | `/routines/:id` 🔒 | Una rutina con sus ejercicios |
@@ -46,6 +48,14 @@ npm run dev               # http://localhost:3000
 | GET | `/exercises/last?names=A&names=B` 🔒 | Series de la última vez que hiciste cada ejercicio |
 
 🔒 = requiere el header `Authorization: Bearer <token>`. Cada usuario solo ve y modifica sus propios datos (los de otro responden 404).
+
+### Seguridad de las cuentas
+
+- **Verificación de email:** código de 6 dígitos, guardado como hash (HMAC), vence en 15 min, máximo 5 intentos y sirve una sola vez.
+- **No revela qué emails están registrados:** registrarse con un email existente responde igual que uno nuevo, y al dueño le llega un aviso por email. El login da el mismo error si la cuenta no existe o la contraseña está mal (y tarda lo mismo).
+- **Límite de intentos por IP** (`express-rate-limit`): 10 logins fallidos cada 15 min, 10 registros por hora, 10 códigos cada 15 min, 5 reenvíos por hora.
+- **Headers de seguridad** con `helmet`.
+- Emails enviados con la API de **Brevo** (`BREVO_API_KEY`, `EMAIL_FROM`); en local, sin clave, se muestran en la terminal.
 
 Ejemplo de body para `POST /routines`:
 
@@ -69,8 +79,10 @@ src/
   db.ts             # cliente de Prisma
   routes/           # endpoints
   schemas/          # validaciones con Zod
-  middleware/       # login requerido, 404 y manejo de errores
+  middleware/       # login requerido, límite de intentos, 404 y manejo de errores
   utils/auth.ts     # hash de contraseñas y tokens JWT
+  utils/email.ts    # envío de emails (Brevo) y sus plantillas
+  utils/email-codes.ts # códigos de verificación de 6 dígitos
 prisma/
   schema.prisma     # modelos (tablas)
   migrations/       # historial de cambios de la base

@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 
 import { ApiError, setAuthToken, setUnauthorizedHandler } from '@/lib/api-client';
-import { authApi } from '@/lib/auth-api';
+import { authApi, type LoginInput, type RegisterInput } from '@/lib/auth-api';
 import { clearSession, loadSession, saveSession } from '@/lib/auth-storage';
 import type { AuthResponse, User } from '@/types';
 
@@ -17,11 +17,12 @@ type AuthState =
   | { status: 'signedOut'; user: null }
   | { status: 'signedIn'; user: User };
 
-type Credentials = { email: string; password: string };
-
 type AuthContextValue = AuthState & {
-  signIn: (credentials: Credentials) => Promise<void>;
-  signUp: (credentials: Credentials) => Promise<void>;
+  signIn: (input: LoginInput) => Promise<void>;
+  /** Crea la cuenta: todavía no inicia sesión, primero hay que verificar el email. */
+  signUp: (input: RegisterInput) => Promise<void>;
+  /** Confirma el código del email e inicia sesión. */
+  verifyEmail: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -45,12 +46,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ status: 'signedIn', user });
   }
 
-  async function signIn(credentials: Credentials) {
-    await startSession(await authApi.login(credentials));
+  async function signIn(input: LoginInput) {
+    await startSession(await authApi.login(input));
   }
 
-  async function signUp(credentials: Credentials) {
-    await startSession(await authApi.register(credentials));
+  async function signUp(input: RegisterInput) {
+    await authApi.register(input);
+  }
+
+  async function verifyEmail(email: string, code: string) {
+    await startSession(await authApi.verifyEmail(email, code));
   }
 
   // Al abrir la app: recupera la sesión guardada (si hay) y la valida con la API.
@@ -87,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, signOut }}>
       {children}
     </AuthContext.Provider>
   );

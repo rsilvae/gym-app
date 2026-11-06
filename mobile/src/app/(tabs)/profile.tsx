@@ -28,7 +28,17 @@ export default function ProfileScreen() {
         <ThemedText type="subtitle">Perfil</ThemedText>
 
         <ThemedView type="backgroundElement" style={styles.card}>
-          <ThemedText type="small" themeColor="textSecondary">
+          {/* Puede faltar en una sesión guardada antes de existir los usuarios (se completa al validar la sesión) */}
+          {user?.username && (
+            <>
+              <ThemedText type="small" themeColor="textSecondary">
+                Usuario
+              </ThemedText>
+              <ThemedText type="smallBold">@{user.username}</ThemedText>
+            </>
+          )}
+
+          <ThemedText type="small" themeColor="textSecondary" style={user?.username ? styles.label : undefined}>
             Email
           </ThemedText>
           <ThemedText type="smallBold">{user?.email}</ThemedText>
