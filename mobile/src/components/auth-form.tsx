@@ -1,6 +1,6 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { ScrollView, StyleSheet } from 'react-native';
+import { Pressable, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -151,6 +151,23 @@ export function AuthForm({ mode }: Props) {
             disabled={isSubmitting}
             onPress={handleSubmit}
           />
+
+          {!isRegister && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                router.push({
+                  pathname: '/forgot-password',
+                  // Si escribió su email, se lo dejamos puesto
+                  params: email.includes('@') ? { email: email.trim() } : {},
+                })
+              }
+              style={styles.switchLink}>
+              <ThemedText type="small" themeColor="primary">
+                ¿Olvidaste tu contraseña?
+              </ThemedText>
+            </Pressable>
+          )}
 
           <Link href={isRegister ? '/login' : '/register'} replace style={styles.switchLink}>
             <ThemedText type="small" themeColor="primary">

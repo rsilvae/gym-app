@@ -23,6 +23,11 @@ function limiter(name: string, windowMs: number, limit: number, options: { onlyF
   });
 }
 
+/**
+ * login: intentos de contraseña · register: cuentas nuevas
+ * verify: intentos de código (verificar email o cambiar contraseña)
+ * resend: emails con código (reenvío u "olvidé mi contraseña")
+ */
 export type AuthLimiters = Record<'login' | 'register' | 'verify' | 'resend', RequestHandler>;
 
 const skip: RequestHandler = (_req, _res, next) => next();
@@ -33,7 +38,7 @@ export function createAuthLimiters(enabled: boolean): AuthLimiters {
   return {
     login: limiter('login', 15 * MINUTE, 10, { onlyFailures: true }),
     register: limiter('registro', 60 * MINUTE, 10),
-    verify: limiter('verificar código', 15 * MINUTE, 10),
-    resend: limiter('reenviar código', 60 * MINUTE, 5),
+    verify: limiter('comprobar código', 15 * MINUTE, 10),
+    resend: limiter('enviar código', 60 * MINUTE, 5),
   };
 }

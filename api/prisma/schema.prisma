@@ -29,6 +29,7 @@ model User {
 /// Para qué sirve un código enviado por email.
 enum EmailCodePurpose {
   VERIFY_EMAIL
+  RESET_PASSWORD
 }
 
 /// Código de 6 dígitos enviado por email. Se guarda solo su hash, como una contraseña.

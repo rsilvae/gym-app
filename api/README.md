@@ -32,6 +32,8 @@ npm run dev               # http://localhost:3000
 | POST | `/auth/register` | Crea la cuenta (`email`, `username`, `password`) sin verificar y envía un código por email → 202 |
 | POST | `/auth/verify-email` | Confirma el código de 6 dígitos → `{ token, user }` |
 | POST | `/auth/resend-code` | Envía un código nuevo (máx. 1 por minuto) → 202 |
+| POST | `/auth/forgot-password` | Envía un código para cambiar la contraseña (misma respuesta exista o no la cuenta) → 202 |
+| POST | `/auth/reset-password` | Código + contraseña nueva (`email`, `code`, `password`) → `{ token, user }`, y avisa por email |
 | POST | `/auth/login` | Inicia sesión con email **o** usuario (`identifier`, `password`) → `{ token, user }`; 403 si falta verificar el email |
 | GET | `/auth/me` 🔒 | Usuario actual |
 | GET | `/routines` 🔒 | Lista tus rutinas |

@@ -4,9 +4,21 @@ import { prisma } from '../db.ts';
 import { Prisma } from '../generated/prisma/client.ts';
 import type { AuthLimiters } from '../middleware/rate-limit.ts';
 import { getUserId, requireAuth } from '../middleware/require-auth.ts';
-import { loginSchema, registerSchema, resendCodeSchema, verifyEmailSchema } from '../schemas/auth.ts';
+import {
+  emailOnlySchema,
+  loginSchema,
+  registerSchema,
+  resetPasswordSchema,
+  verifyEmailSchema,
+} from '../schemas/auth.ts';
 import { createToken, hashPassword, verifyPassword } from '../utils/auth.ts';
-import { accountExistsEmail, sendEmail, verificationEmail } from '../utils/email.ts';
+import {
+  accountExistsEmail,
+  passwordChangedEmail,
+  passwordResetEmail,
+  sendEmail,
+  verificationEmail,
+} from '../utils/email.ts';
 import { CODE_TTL_MINUTES, consumeEmailCode, issueEmailCode } from '../utils/email-codes.ts';
 import { HttpError } from '../utils/http-error.ts';
 import { validate } from '../utils/validate.ts';
@@ -16,6 +28,8 @@ import { validate } from '../utils/validate.ts';
  *   POST /auth/register     → crea la cuenta (sin verificar) y envía un código por email
  *   POST /auth/verify-email → confirma el código y devuelve { token, user }
  *   POST /auth/resend-code  → envía un código nuevo
+ *   POST /auth/forgot-password → envía un código para cambiar la contraseña
+ *   POST /auth/reset-password  → código + contraseña nueva; devuelve { token, user }
  *   POST /auth/login        → con email o usuario; devuelve { token, user }
  *   GET  /auth/me           → el usuario del token (requiere login)
  */
@@ -98,12 +112,49 @@ export function createAuthRouter(limiters: AuthLimiters) {
   });
 
   router.post('/resend-code', limiters.resend, async (req, res) => {
-    const { email } = validate(resendCodeSchema, req.body);
+    const { email } = validate(emailOnlySchema, req.body);
 
     const user = await prisma.user.findUnique({ where: { email } });
     if (user && !user.emailVerifiedAt) await sendVerificationCode(user);
     // Misma respuesta exista o no la cuenta
     res.status(202).json(codeSentResponse(email));
+  });
+
+  router.post('/forgot-password', limiters.resend, async (req, res) => {
+    const { email } = validate(emailOnlySchema, req.body);
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user) {
+      const code = await issueEmailCode(user.id, 'RESET_PASSWORD');
+      if (code) await sendEmail(passwordResetEmail(user.email, code, CODE_TTL_MINUTES));
+    }
+    // Misma respuesta exista o no la cuenta: no se puede usar para averiguar emails
+    res.status(202).json(codeSentResponse(email));
+  });
+
+  router.post('/reset-password', limiters.verify, async (req, res) => {
+    const { email, code, password } = validate(resetPasswordSchema, req.body);
+
+    const user = await prisma.user.findUnique({ where: { email } });
+    const isValid = user && (await consumeEmailCode(user.id, 'RESET_PASSWORD', code));
+    if (!isValid) {
+      throw new HttpError(400, 'Código incorrecto o vencido');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await hashPassword(password),
+        // Recibir el código ya demuestra que el email es suyo
+        emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+      },
+      select: publicUser,
+    });
+    // Ya no hace falta un código de verificación pendiente (si había)
+    await prisma.emailCode.deleteMany({ where: { userId: user.id } });
+    await sendEmail(passwordChangedEmail(user.email));
+
+    res.json({ token: createToken(updated.id), user: updated });
   });
 
   router.post('/login', limiters.login, async (req, res) => {

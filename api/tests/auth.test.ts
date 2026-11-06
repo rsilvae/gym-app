@@ -210,6 +210,81 @@ describe('POST /auth/login', () => {
   });
 });
 
+describe('Olvidé mi contraseña', () => {
+  beforeEach(async () => {
+    await createUser('ana@test.com', 'secreta123', 'ana_fit');
+    outbox.length = 0;
+  });
+
+  const forgot = (email = 'ana@test.com') => request(app).post('/auth/forgot-password').send({ email });
+  const reset = (body: Record<string, string>) =>
+    request(app).post('/auth/reset-password').send({ email: 'ana@test.com', password: 'clave-nueva-123', ...body });
+
+  it('con el código cambia la contraseña, inicia sesión y avisa por email', async () => {
+    expect((await forgot()).status).toBe(202);
+    const response = await reset({ code: lastCodeFor('ana@test.com') });
+
+    expect(response.status).toBe(200);
+    expect(response.body.token).toEqual(expect.any(String));
+    expect(response.body.user.username).toBe('ana_fit');
+    expect(outbox.at(-1)?.subject).toMatch(/contraseña .* cambió/i);
+
+    const oldPassword = await request(app).post('/auth/login').send({ identifier: 'ana_fit', password: 'secreta123' });
+    const newPassword = await request(app)
+      .post('/auth/login')
+      .send({ identifier: 'ana_fit', password: 'clave-nueva-123' });
+    expect(oldPassword.status).toBe(401);
+    expect(newPassword.status).toBe(200);
+  });
+
+  it('responde igual si el email no existe, sin enviar nada', async () => {
+    const unknown = await forgot('nadie@test.com');
+    const known = await forgot();
+
+    expect(unknown.status).toBe(202);
+    expect(unknown.body.message).toBe(known.body.message);
+    expect(outbox.map((email) => email.to)).toEqual(['ana@test.com']);
+  });
+
+  it('rechaza un código incorrecto y no cambia la contraseña', async () => {
+    await forgot();
+    const code = lastCodeFor('ana@test.com');
+    const response = await reset({ code: code === '000000' ? '111111' : '000000' });
+    expect(response.status).toBe(400);
+
+    const login = await request(app).post('/auth/login').send({ identifier: 'ana_fit', password: 'secreta123' });
+    expect(login.status).toBe(200);
+  });
+
+  it('el código de verificar email no sirve para cambiar la contraseña', async () => {
+    await request(app).post('/auth/register').send({ email: 'beto@test.com', username: 'beto', password: 'secreta123' });
+    const verifyCode = lastCodeFor('beto@test.com');
+    const response = await request(app)
+      .post('/auth/reset-password')
+      .send({ email: 'beto@test.com', code: verifyCode, password: 'clave-nueva-123' });
+    expect(response.status).toBe(400);
+  });
+
+  it('sirve también si el email no estaba verificado (y lo deja verificado)', async () => {
+    await request(app).post('/auth/register').send({ email: 'beto@test.com', username: 'beto', password: 'secreta123' });
+    await request(app).post('/auth/forgot-password').send({ email: 'beto@test.com' });
+    const response = await request(app)
+      .post('/auth/reset-password')
+      .send({ email: 'beto@test.com', code: lastCodeFor('beto@test.com'), password: 'clave-nueva-123' });
+
+    expect(response.status).toBe(200);
+    const user = await prisma.user.findUniqueOrThrow({ where: { email: 'beto@test.com' } });
+    expect(user.emailVerifiedAt).not.toBeNull();
+  });
+
+  it('valida la contraseña nueva', async () => {
+    await forgot();
+    const response = await reset({ code: lastCodeFor('ana@test.com'), password: 'corta' });
+    expect(response.status).toBe(400);
+    expect(response.body.details.fieldErrors).toHaveProperty('password');
+  });
+});
+
 describe('Límite de intentos', () => {
   it('después de 10 logins fallidos responde 429', async () => {
     const limitedApp = createApp(); // con límites, como en producción

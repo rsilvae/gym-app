@@ -16,6 +16,11 @@ export const authApi = {
 
   resendCode: (email: string) => post<CodeSentResponse>('/auth/resend-code', { email }),
 
+  forgotPassword: (email: string) => post<CodeSentResponse>('/auth/forgot-password', { email }),
+
+  resetPassword: (email: string, code: string, password: string) =>
+    post<AuthResponse>('/auth/reset-password', { email, code, password }),
+
   login: (input: LoginInput) => post<AuthResponse>('/auth/login', input),
 
   me: () => apiFetch<User>('/auth/me'),

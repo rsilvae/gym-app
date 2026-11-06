@@ -15,13 +15,17 @@ const username = z
   .toLowerCase()
   .regex(USERNAME_REGEX, 'El usuario debe tener de 3 a 20 caracteres: letras, números, _ o .');
 
+const newPassword = z
+  .string()
+  .min(8, 'La contraseña debe tener al menos 8 caracteres')
+  .max(72, 'La contraseña puede tener como máximo 72 caracteres'); // límite de bcrypt
+
+const code = z.string().trim().regex(/^\d{6}$/, 'El código tiene 6 dígitos');
+
 export const registerSchema = z.object({
   email,
   username,
-  password: z
-    .string()
-    .min(8, 'La contraseña debe tener al menos 8 caracteres')
-    .max(72, 'La contraseña puede tener como máximo 72 caracteres'), // límite de bcrypt
+  password: newPassword,
 });
 
 export const loginSchema = z.object({
@@ -30,9 +34,9 @@ export const loginSchema = z.object({
   password: z.string().min(1, 'Escribe tu contraseña').max(72),
 });
 
-export const verifyEmailSchema = z.object({
-  email,
-  code: z.string().trim().regex(/^\d{6}$/, 'El código tiene 6 dígitos'),
-});
+export const verifyEmailSchema = z.object({ email, code });
 
-export const resendCodeSchema = z.object({ email });
+/** Para /auth/resend-code y /auth/forgot-password. */
+export const emailOnlySchema = z.object({ email });
+
+export const resetPasswordSchema = z.object({ email, code, password: newPassword });
