@@ -13,6 +13,8 @@ export type WorkoutDraft = {
   version: 1;
   state: WorkoutState;
   restSeconds: number;
+  /** Descanso que estaba corriendo: hora de término y duración total (null si no había). */
+  rest?: { endsAt: number; totalMs: number } | null;
   savedAt: number;
 };
 

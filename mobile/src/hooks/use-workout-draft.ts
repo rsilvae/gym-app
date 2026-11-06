@@ -26,9 +26,9 @@ export function useWorkoutDraft() {
   });
 
   /** Guarda el estado actual del entrenamiento (en memoria y en el celular). */
-  function saveDraft(state: WorkoutState, restSeconds: number) {
+  function saveDraft(state: WorkoutState, restSeconds: number, rest: WorkoutDraft['rest']) {
     if (!userId) return;
-    const draft: WorkoutDraft = { version: 1, state, restSeconds, savedAt: Date.now() };
+    const draft: WorkoutDraft = { version: 1, state, restSeconds, rest, savedAt: Date.now() };
     queryClient.setQueryData(draftKey(userId), draft);
     void workoutDraftStorage.save(userId, draft);
   }

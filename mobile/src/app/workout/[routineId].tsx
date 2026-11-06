@@ -20,7 +20,7 @@ import {
   type WorkoutState,
 } from '@/features/workout/workout-reducer';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
-import { useRestTimer } from '@/hooks/use-rest-timer';
+import { useRestTimer, type RunningRest } from '@/hooks/use-rest-timer';
 import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkoutDraft } from '@/hooks/use-workout-draft';
@@ -46,38 +46,55 @@ export default function WorkoutScreen() {
 
   if (isDraftLoading) return <LoadingView />;
   if (resumable) {
-    return <ActiveWorkout initialState={resumable.state} initialRestSeconds={resumable.restSeconds} />;
+    return (
+      <ActiveWorkout
+        initialState={resumable.state}
+        initialRestSeconds={resumable.restSeconds}
+        initialRest={resumable.rest ?? null}
+      />
+    );
   }
 
   if (isPending) return <LoadingView />;
   if (error) return <ErrorView error={error} onRetry={refetch} />;
 
-  return <ActiveWorkout initialState={createWorkoutState(routine)} initialRestSeconds={DEFAULT_REST_SECONDS} />;
+  return (
+    <ActiveWorkout
+      initialState={createWorkoutState(routine)}
+      initialRestSeconds={DEFAULT_REST_SECONDS}
+      initialRest={null}
+    />
+  );
 }
 
 type ActiveWorkoutProps = {
   initialState: WorkoutState;
   initialRestSeconds: number;
+  /** Descanso que estaba corriendo cuando se cerró la app (si había). */
+  initialRest: RunningRest | null;
 };
 
-function ActiveWorkout({ initialState, initialRestSeconds }: ActiveWorkoutProps) {
+function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: ActiveWorkoutProps) {
   const theme = useTheme();
   // useReducer(reducer, estado inicial). Solo se usa la primera vez que se muestra la pantalla.
   const [state, dispatch] = useReducer(workoutReducer, initialState);
   const elapsed = useElapsedTime(state.startedAt);
   const { completed, total } = getProgress(state);
   const progress = total > 0 ? completed / total : 0;
-  const restTimer = useRestTimer(initialRestSeconds);
+  const restTimer = useRestTimer({ restSeconds: initialRestSeconds, running: initialRest });
 
   const { saveDraft, clearDraft } = useWorkoutDraft();
   const restSeconds = restTimer.restSeconds;
+  const runningRest = restTimer.running;
   // Cada vez que cambia algo (una serie, un peso, el descanso), se guarda en el celular.
-  // Así, si la app se cierra, no pierdes lo que llevabas.
+  // Así, si la app se cierra, no pierdes lo que llevabas, ni el descanso que estaba corriendo.
+  // (No depende de los segundos restantes: el descanso se guarda por su hora de término,
+  // así que solo se guarda al empezarlo, ajustarlo, saltarlo o cuando termina.)
   useEffect(() => {
-    saveDraft(state, restSeconds);
+    saveDraft(state, restSeconds, runningRest);
     // saveDraft cambia en cada render; solo queremos guardar cuando cambian los datos
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, restSeconds]);
+  }, [state, restSeconds, runningRest]);
 
   const saveWorkout = useSaveWorkout();
   // "La última vez" de cada ejercicio de la rutina (si ya los hiciste antes)
