@@ -9,6 +9,7 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 - 🔐 Registro e inicio de sesión (JWT), con sesión guardada de forma segura en el celular
 - 📋 Crear, editar, reordenar y eliminar rutinas
 - ✅ Entrenamiento en curso: cronómetro, progreso y check por serie con peso y reps editables
+- 💾 El entrenamiento en curso se guarda en el celular: si la app se cierra, lo retomas donde quedaste
 - ⏱️ Temporizador de descanso automático al marcar una serie (ajustable, vibra al terminar)
 - 🕑 "Última vez": muestra lo que hiciste en cada ejercicio la sesión anterior
 - 📈 Historial con duración, series y volumen total de cada entrenamiento
@@ -100,6 +101,6 @@ Se configura con [`render.yaml`](render.yaml): en cada push a `main` se compila,
 - [ ] Fase 9 – Mejoras
   - [x] Publicar la app con EAS Update (abrirla sin la PC)
   - [x] Temporizador de descanso con vibración
-  - [ ] Guardar el entrenamiento en curso
+  - [x] Guardar el entrenamiento en curso (se retoma si la app se cierra)
   - [ ] Gráficos de progreso
   - [ ] Build instalable (EAS Build)

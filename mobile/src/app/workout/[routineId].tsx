@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useReducer } from 'react';
+import { useEffect, useReducer } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
@@ -17,48 +17,83 @@ import {
   toWorkoutInput,
   workoutReducer,
   type ActiveExercise,
+  type WorkoutState,
 } from '@/features/workout/workout-reducer';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
 import { useRestTimer } from '@/hooks/use-rest-timer';
 import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
+import { useWorkoutDraft } from '@/hooks/use-workout-draft';
 import { useLastPerformanceQuery, useSaveWorkout } from '@/hooks/use-workouts';
-import type { Routine } from '@/types';
 import { formatRelativeDay, formatSets } from '@/utils/format';
+
+const DEFAULT_REST_SECONDS = 90;
 
 /**
  * Pantalla del entrenamiento en curso: /workout/<id de la rutina>.
- * Busca la rutina y, si existe, muestra <ActiveWorkout>.
+ *
+ * - Si hay un borrador guardado de ESTA rutina (la app se cerró a mitad), lo retoma.
+ * - Si no, busca la rutina y empieza un entrenamiento nuevo.
+ *
  * (Se separa en dos componentes porque los hooks como useReducer
  * no pueden ir después de un "return" condicional.)
  */
 export default function WorkoutScreen() {
   const { routineId } = useLocalSearchParams<{ routineId: string }>();
+  const { draft, isLoading: isDraftLoading } = useWorkoutDraft();
+  const resumable = draft?.state.routineId === routineId ? draft : null;
   const { data: routine, isPending, error, refetch } = useRoutineQuery(routineId);
+
+  if (isDraftLoading) return <LoadingView />;
+  if (resumable) {
+    return <ActiveWorkout initialState={resumable.state} initialRestSeconds={resumable.restSeconds} />;
+  }
 
   if (isPending) return <LoadingView />;
   if (error) return <ErrorView error={error} onRetry={refetch} />;
 
-  return <ActiveWorkout routine={routine} />;
+  return <ActiveWorkout initialState={createWorkoutState(routine)} initialRestSeconds={DEFAULT_REST_SECONDS} />;
 }
 
-function ActiveWorkout({ routine }: { routine: Routine }) {
+type ActiveWorkoutProps = {
+  initialState: WorkoutState;
+  initialRestSeconds: number;
+};
+
+function ActiveWorkout({ initialState, initialRestSeconds }: ActiveWorkoutProps) {
   const theme = useTheme();
-  // useReducer(reducer, argumento, función que crea el estado inicial)
-  const [state, dispatch] = useReducer(workoutReducer, routine, createWorkoutState);
+  // useReducer(reducer, estado inicial). Solo se usa la primera vez que se muestra la pantalla.
+  const [state, dispatch] = useReducer(workoutReducer, initialState);
   const elapsed = useElapsedTime(state.startedAt);
   const { completed, total } = getProgress(state);
   const progress = total > 0 ? completed / total : 0;
-  const restTimer = useRestTimer(90);
+  const restTimer = useRestTimer(initialRestSeconds);
+
+  const { saveDraft, clearDraft } = useWorkoutDraft();
+  const restSeconds = restTimer.restSeconds;
+  // Cada vez que cambia algo (una serie, un peso, el descanso), se guarda en el celular.
+  // Así, si la app se cierra, no pierdes lo que llevabas.
+  useEffect(() => {
+    saveDraft(state, restSeconds);
+    // saveDraft cambia en cada render; solo queremos guardar cuando cambian los datos
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, restSeconds]);
 
   const saveWorkout = useSaveWorkout();
   // "La última vez" de cada ejercicio de la rutina (si ya los hiciste antes)
-  const { data: lastPerformance } = useLastPerformanceQuery(routine.exercises.map((exercise) => exercise.name));
+  const { data: lastPerformance } = useLastPerformanceQuery(state.exercises.map((exercise) => exercise.name));
 
   function confirmCancel() {
     Alert.alert('Cancelar entrenamiento', 'Se perderá lo que registraste. ¿Salir?', [
       { text: 'Seguir entrenando', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: () => router.back() },
+      {
+        text: 'Salir',
+        style: 'destructive',
+        onPress: () => {
+          void clearDraft();
+          router.back();
+        },
+      },
     ]);
   }
 
@@ -69,6 +104,8 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
 
     saveWorkout.mutate(toWorkoutInput(state, finishedAt), {
       onSuccess: ({ id }) => {
+        // Ya quedó guardado en la API: el borrador del celular ya no hace falta
+        void clearDraft();
         Alert.alert('¡Buen trabajo! 💪', `Hiciste ${completed} de ${total} series en ${duration}.`);
         // replace: "atrás" desde el detalle vuelve a la rutina, no al entrenamiento terminado
         router.replace({ pathname: '/workout-detail/[id]', params: { id } });

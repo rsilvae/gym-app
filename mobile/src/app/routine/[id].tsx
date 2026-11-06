@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useDeleteRoutine, useRoutineQuery } from '@/hooks/use-routines';
+import { useWorkoutDraft } from '@/hooks/use-workout-draft';
 import type { RoutineExercise } from '@/types';
 
 /**
@@ -17,9 +18,40 @@ export default function RoutineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: routine, isPending, error, refetch } = useRoutineQuery(id);
   const deleteRoutine = useDeleteRoutine();
+  const { draft, clearDraft } = useWorkoutDraft();
+  const hasDraftForThisRoutine = draft?.state.routineId === id;
 
   if (isPending) return <LoadingView />;
   if (error) return <ErrorView error={error} onRetry={refetch} />;
+
+  function openWorkout(routineId: string) {
+    router.push({ pathname: '/workout/[routineId]', params: { routineId } });
+  }
+
+  /** Solo puede haber un entrenamiento en curso: si hay otro sin terminar, preguntamos. */
+  function startWorkout() {
+    if (!draft || hasDraftForThisRoutine) {
+      openWorkout(id);
+      return;
+    }
+    const otherRoutineId = draft.state.routineId;
+    Alert.alert(
+      'Tienes un entrenamiento sin terminar',
+      `"${draft.state.routineName}" sigue en curso. ¿Qué quieres hacer?`,
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: `Continuar "${draft.state.routineName}"`, onPress: () => openWorkout(otherRoutineId) },
+        {
+          text: 'Descartarlo y empezar este',
+          style: 'destructive',
+          onPress: async () => {
+            await clearDraft();
+            openWorkout(id);
+          },
+        },
+      ],
+    );
+  }
 
   function confirmDelete() {
     Alert.alert('Eliminar rutina', `¿Seguro que quieres eliminar "${routine?.name}"?`, [
@@ -59,9 +91,9 @@ export default function RoutineDetailScreen() {
         renderItem={({ item, index }) => <ExerciseRow exercise={item} position={index + 1} />}
         ListHeaderComponent={
           <Button
-            title="Empezar entrenamiento"
+            title={hasDraftForThisRoutine ? 'Continuar entrenamiento' : 'Empezar entrenamiento'}
             disabled={routine.exercises.length === 0}
-            onPress={() => router.push({ pathname: '/workout/[routineId]', params: { routineId: id } })}
+            onPress={startWorkout}
           />
         }
         ListFooterComponent={

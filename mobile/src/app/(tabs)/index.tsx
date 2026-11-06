@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ActiveWorkoutBanner } from '@/components/active-workout-banner';
 import { Button } from '@/components/button';
 import { ErrorView, LoadingView } from '@/components/query-status';
 import { RoutineCard } from '@/components/routine-card';
@@ -18,9 +19,13 @@ export default function RoutinesScreen() {
   const { data: routines, isPending, error, refetch, isRefetching } = useRoutinesQuery();
 
   const header = (
-    <View style={styles.header}>
-      <ThemedText type="subtitle">Mis rutinas</ThemedText>
-      <Button title="+ Nueva" compact onPress={() => router.push('/routine/new')} />
+    <View style={styles.headerContainer}>
+      <View style={styles.header}>
+        <ThemedText type="subtitle">Mis rutinas</ThemedText>
+        <Button title="+ Nueva" compact onPress={() => router.push('/routine/new')} />
+      </View>
+      {/* Si la app se cerró a mitad de un entrenamiento, aquí aparece para retomarlo */}
+      <ActiveWorkoutBanner />
     </View>
   );
 
@@ -58,6 +63,9 @@ export default function RoutinesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  headerContainer: {
+    gap: Spacing.three,
   },
   header: {
     flexDirection: 'row',
