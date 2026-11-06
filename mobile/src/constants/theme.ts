@@ -13,6 +13,8 @@ export const Colors = {
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
     primary: '#FF6B2C',
+    /** Línea de los gráficos: naranja más oscuro para que contraste con la tarjeta (≥ 3:1). */
+    chart: '#D9531A',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +23,7 @@ export const Colors = {
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
     primary: '#FF7E45',
+    chart: '#E8692F',
   },
 } as const;
 

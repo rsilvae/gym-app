@@ -13,6 +13,7 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 - ⏱️ Temporizador de descanso automático al marcar una serie (ajustable, vibra al terminar)
 - 🕑 "Última vez": muestra lo que hiciste en cada ejercicio la sesión anterior
 - 📈 Historial con duración, series y volumen total de cada entrenamiento
+- 📊 Gráfico de progreso por ejercicio: peso máximo, 1RM estimado (Epley), volumen y reps
 
 ## Stack
 
@@ -102,5 +103,5 @@ Se configura con [`render.yaml`](render.yaml): en cada push a `main` se compila,
   - [x] Publicar la app con EAS Update (abrirla sin la PC)
   - [x] Temporizador de descanso con vibración
   - [x] Guardar el entrenamiento en curso (se retoma si la app se cierra)
-  - [ ] Gráficos de progreso
+  - [x] Gráficos de progreso por ejercicio
   - [ ] Build instalable (EAS Build)

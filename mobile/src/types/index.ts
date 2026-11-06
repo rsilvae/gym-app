@@ -72,3 +72,21 @@ export type WorkoutDetail = {
 
 /** "La última vez": por nombre de ejercicio, cuándo fue y qué series hiciste. */
 export type LastPerformance = Record<string, { finishedAt: string; sets: PerformedSet[] }>;
+
+/** Un ejercicio que hiciste alguna vez (GET /exercises). */
+export type ExerciseSummary = {
+  name: string;
+  sessionCount: number;
+  lastPerformedAt: string;
+};
+
+/** Un punto del gráfico de progreso: un entrenamiento (GET /exercises/progress). */
+export type ProgressPoint = {
+  workoutId: string;
+  finishedAt: string;
+  maxWeight: number;
+  estimatedOneRepMax: number;
+  volume: number;
+  maxReps: number;
+  setCount: number;
+};

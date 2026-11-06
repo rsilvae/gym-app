@@ -9,12 +9,24 @@ import type { WorkoutInput } from '@/types';
  *   ['workouts']                 → historial
  *   ['workouts', id]             → un entrenamiento
  *   ['last-performance', names]  → "la última vez" de unos ejercicios
+ *   ['exercises']                → ejercicios que hiciste alguna vez
+ *   ['exercises', name]          → progreso de un ejercicio
  */
 export const workoutKeys = {
   all: ['workouts'] as const,
   detail: (id: string) => ['workouts', id] as const,
   lastPerformance: (names: string[]) => ['last-performance', ...names] as const,
+  exercises: ['exercises'] as const,
+  progress: (name: string) => ['exercises', name.toLowerCase()] as const,
 };
+
+export function useExercisesQuery() {
+  return useQuery({ queryKey: workoutKeys.exercises, queryFn: workoutsApi.exercises });
+}
+
+export function useExerciseProgressQuery(name: string) {
+  return useQuery({ queryKey: workoutKeys.progress(name), queryFn: () => workoutsApi.progress(name) });
+}
 
 export function useWorkoutsQuery() {
   return useQuery({ queryKey: workoutKeys.all, queryFn: workoutsApi.list });
@@ -36,6 +48,7 @@ export function useLastPerformanceQuery(names: string[]) {
 function invalidateWorkoutData(queryClient: ReturnType<typeof useQueryClient>) {
   queryClient.invalidateQueries({ queryKey: workoutKeys.all, exact: true });
   queryClient.invalidateQueries({ queryKey: ['last-performance'] });
+  queryClient.invalidateQueries({ queryKey: workoutKeys.exercises }); // también los gráficos
 }
 
 export function useSaveWorkout() {

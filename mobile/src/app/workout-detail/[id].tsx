@@ -1,5 +1,5 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { ErrorView, LoadingView } from '@/components/query-status';
@@ -60,9 +60,19 @@ export default function WorkoutDetailScreen() {
         {/* Ejercicios */}
         {workout.exercises.map((exercise, index) => (
           <ThemedView key={`${exercise.name}-${index}`} type="backgroundElement" style={styles.card}>
-            <ThemedText type="smallBold" style={styles.exerciseName}>
-              {exercise.name}
-            </ThemedText>
+            {/* Al tocar el nombre se abre el gráfico de progreso de ese ejercicio */}
+            <Pressable
+              accessibilityRole="button"
+              accessibilityHint="Abre el gráfico de progreso"
+              onPress={() => router.push({ pathname: '/progress/[name]', params: { name: exercise.name } })}
+              style={({ pressed }) => [styles.exerciseHeader, pressed && styles.pressed]}>
+              <ThemedText type="smallBold" style={styles.exerciseName}>
+                {exercise.name}
+              </ThemedText>
+              <ThemedText type="small" themeColor="primary">
+                Ver progreso ›
+              </ThemedText>
+            </Pressable>
             {exercise.sets.map((set) => (
               <View key={set.setNumber} style={styles.setRow}>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.setNumber}>
@@ -122,9 +132,19 @@ const styles = StyleSheet.create({
   stat: {
     flex: 1,
   },
+  exerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.two,
+  },
+  pressed: {
+    opacity: 0.6,
+  },
   exerciseName: {
     fontSize: 18,
     lineHeight: 24,
+    flexShrink: 1,
   },
   setRow: {
     flexDirection: 'row',

@@ -1,6 +1,8 @@
-import { FlatList, RefreshControl, StyleSheet } from 'react-native';
+import { router } from 'expo-router';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Button } from '@/components/button';
 import { ErrorView, LoadingView } from '@/components/query-status';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -24,7 +26,12 @@ export default function HistoryScreen() {
           data={workouts}
           keyExtractor={(workout) => workout.id}
           renderItem={({ item }) => <WorkoutCard workout={item} />}
-          ListHeaderComponent={<ThemedText type="subtitle">Historial</ThemedText>}
+          ListHeaderComponent={
+            <View style={styles.header}>
+              <ThemedText type="subtitle">Historial</ThemedText>
+              <Button title="📈 Progreso" compact onPress={() => router.push('/exercises')} />
+            </View>
+          }
           ListEmptyComponent={
             <ThemedText themeColor="textSecondary">
               Todavía no tienes entrenamientos. Cuando termines uno, aparecerá aquí.
@@ -47,6 +54,11 @@ export default function HistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   list: {
     padding: Spacing.three,

@@ -41,6 +41,8 @@ npm run dev               # http://localhost:3000
 | GET | `/workouts` 🔒 | Historial (resumen: series, volumen, duración) |
 | GET | `/workouts/:id` 🔒 | Detalle con las series de cada ejercicio |
 | DELETE | `/workouts/:id` 🔒 | Elimina un entrenamiento |
+| GET | `/exercises` 🔒 | Ejercicios que hiciste alguna vez (con cuántas veces y la última fecha) |
+| GET | `/exercises/progress?name=A` 🔒 | Un punto por entrenamiento: peso máx., 1RM estimado, volumen, reps máx. |
 | GET | `/exercises/last?names=A&names=B` 🔒 | Series de la última vez que hiciste cada ejercicio |
 
 🔒 = requiere el header `Authorization: Bearer <token>`. Cada usuario solo ve y modifica sus propios datos (los de otro responden 404).

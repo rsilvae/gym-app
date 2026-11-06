@@ -1,5 +1,12 @@
 import { apiFetch } from '@/lib/api-client';
-import type { LastPerformance, WorkoutDetail, WorkoutInput, WorkoutSummary } from '@/types';
+import type {
+  ExerciseSummary,
+  LastPerformance,
+  ProgressPoint,
+  WorkoutDetail,
+  WorkoutInput,
+  WorkoutSummary,
+} from '@/types';
 
 /** Funciones que llaman a los endpoints de /workouts y /exercises de la API. */
 export const workoutsApi = {
@@ -17,4 +24,11 @@ export const workoutsApi = {
     const query = names.map((name) => `names=${encodeURIComponent(name)}`).join('&');
     return apiFetch<LastPerformance>(`/exercises/last?${query}`);
   },
+
+  /** Los ejercicios que hiciste alguna vez. */
+  exercises: () => apiFetch<ExerciseSummary[]>('/exercises'),
+
+  /** Un punto por entrenamiento para el gráfico de un ejercicio. */
+  progress: (name: string) =>
+    apiFetch<ProgressPoint[]>(`/exercises/progress?name=${encodeURIComponent(name)}`),
 };

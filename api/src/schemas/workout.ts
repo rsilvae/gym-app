@@ -37,3 +37,8 @@ export const lastPerformanceQuerySchema = z.object({
     .transform((value) => (Array.isArray(value) ? value : [value]))
     .pipe(z.array(z.string().trim().min(1).max(100)).min(1).max(50)),
 });
+
+/** Query de GET /exercises/progress: el nombre de un ejercicio (?name=Sentadilla). */
+export const exerciseProgressQuerySchema = z.object({
+  name: z.string().trim().min(1, 'Falta el nombre del ejercicio').max(100),
+});
