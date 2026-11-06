@@ -35,8 +35,3 @@ export const MOCK_ROUTINES: Routine[] = [
     ],
   },
 ];
-
-/** Busca una rutina por su id (devuelve undefined si no existe). */
-export function getRoutineById(id: string): Routine | undefined {
-  return MOCK_ROUTINES.find((routine) => routine.id === id);
-}

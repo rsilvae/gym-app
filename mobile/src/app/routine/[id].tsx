@@ -1,11 +1,12 @@
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { FlatList, StyleSheet } from 'react-native';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Alert, FlatList, Pressable, StyleSheet } from 'react-native';
 
+import { Button } from '@/components/button';
 import { EmptyState } from '@/components/empty-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { getRoutineById } from '@/data/mock-routines';
+import { useRoutines } from '@/context/routines-context';
 import type { RoutineExercise } from '@/types';
 
 /**
@@ -14,21 +15,53 @@ import type { RoutineExercise } from '@/types';
  */
 export default function RoutineDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const routine = getRoutineById(id);
+  const { getRoutine, deleteRoutine } = useRoutines();
+  const routine = getRoutine(id);
 
   if (!routine) {
     return <EmptyState title="No encontrada" message="Esta rutina no existe." />;
   }
 
+  function confirmDelete() {
+    Alert.alert('Eliminar rutina', `¿Seguro que quieres eliminar "${routine?.name}"?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () => {
+          // Primero volvemos a la lista y después borramos,
+          // para no mostrar un instante la pantalla "No encontrada".
+          router.back();
+          deleteRoutine(id);
+        },
+      },
+    ]);
+  }
+
   return (
     <ThemedView style={styles.container}>
-      {/* Cambia el título de la barra de arriba por el nombre de la rutina */}
-      <Stack.Screen options={{ title: routine.name }} />
+      {/* Cambia el título de la barra de arriba y agrega el botón "Editar" */}
+      <Stack.Screen
+        options={{
+          title: routine.name,
+          headerRight: () => (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={12}
+              onPress={() => router.push({ pathname: '/routine/edit/[id]', params: { id } })}>
+              <ThemedText themeColor="primary">Editar</ThemedText>
+            </Pressable>
+          ),
+        }}
+      />
 
       <FlatList
         data={routine.exercises}
         keyExtractor={(exercise) => exercise.id}
         renderItem={({ item, index }) => <ExerciseRow exercise={item} position={index + 1} />}
+        ListFooterComponent={
+          <Button title="Eliminar rutina" variant="danger" onPress={confirmDelete} />
+        }
         contentContainerStyle={styles.list}
         contentInsetAdjustmentBehavior="automatic"
       />

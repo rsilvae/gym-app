@@ -18,3 +18,6 @@ export type Routine = {
   name: string;
   exercises: RoutineExercise[];
 };
+
+/** Los datos para crear o editar una rutina (todo menos el id, que se genera solo). */
+export type RoutineInput = Omit<Routine, 'id'>;
