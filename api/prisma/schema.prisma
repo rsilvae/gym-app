@@ -18,6 +18,7 @@ model User {
   passwordHash String
   createdAt    DateTime  @default(now())
   routines     Routine[]
+  workouts     Workout[]
 }
 
 /// Una rutina de entrenamiento (ej: "Pecho y tríceps"). Pertenece a un usuario.
@@ -29,6 +30,7 @@ model Routine {
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   exercises RoutineExercise[]
+  workouts  Workout[]
 
   @@index([userId])
 }
@@ -46,4 +48,37 @@ model RoutineExercise {
   targetWeight Float   @default(0) // kg; 0 = peso corporal
 
   @@index([routineId])
+}
+
+/// Un entrenamiento terminado (una sesión en el gimnasio).
+model Workout {
+  id          String       @id @default(cuid())
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // onDelete: SetNull → si borras la rutina, el historial se conserva (sin el enlace).
+  routineId   String?
+  routine     Routine?     @relation(fields: [routineId], references: [id], onDelete: SetNull)
+  // Copia del nombre: así el historial se lee bien aunque la rutina cambie o se borre.
+  routineName String
+  startedAt   DateTime
+  finishedAt  DateTime
+  createdAt   DateTime     @default(now())
+  sets        WorkoutSet[]
+
+  @@index([userId, finishedAt])
+}
+
+/// Una serie hecha en un entrenamiento: qué ejercicio, cuánto peso y cuántas reps.
+model WorkoutSet {
+  id            String  @id @default(cuid())
+  workoutId     String
+  workout       Workout @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exerciseName  String
+  exerciseOrder Int // posición del ejercicio en el entrenamiento (0, 1, 2...)
+  setNumber     Int // número de serie dentro del ejercicio (1, 2, 3...)
+  weight        Float // kg
+  reps          Int
+
+  @@index([workoutId])
+  @@index([exerciseName])
 }

@@ -43,5 +43,5 @@ Escanea el código QR con **Expo Go** en tu celular. El celular y la PC deben es
 - [x] Fase 4 – API con Express + PostgreSQL
 - [x] Fase 5 – Conectar app y API
 - [x] Fase 6 – Login con JWT
-- [ ] Fase 7 – Historial de entrenamientos
+- [x] Fase 7 – Historial de entrenamientos
 - [ ] Fase 8 – Tests, CI y deploy

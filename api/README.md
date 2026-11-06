@@ -35,8 +35,13 @@ npm run dev               # http://localhost:3000
 | POST | `/routines` 🔒 | Crea una rutina |
 | PUT | `/routines/:id` 🔒 | Reemplaza nombre y ejercicios |
 | DELETE | `/routines/:id` 🔒 | Elimina una rutina |
+| POST | `/workouts` 🔒 | Guarda un entrenamiento terminado |
+| GET | `/workouts` 🔒 | Historial (resumen: series, volumen, duración) |
+| GET | `/workouts/:id` 🔒 | Detalle con las series de cada ejercicio |
+| DELETE | `/workouts/:id` 🔒 | Elimina un entrenamiento |
+| GET | `/exercises/last?names=A&names=B` 🔒 | Series de la última vez que hiciste cada ejercicio |
 
-🔒 = requiere el header `Authorization: Bearer <token>`. Cada usuario solo ve y modifica sus propias rutinas (las de otro responden 404).
+🔒 = requiere el header `Authorization: Bearer <token>`. Cada usuario solo ve y modifica sus propios datos (los de otro responden 404).
 
 Ejemplo de body para `POST /routines`:
 

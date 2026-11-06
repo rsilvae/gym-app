@@ -1,6 +1,5 @@
 /**
- * Tipos principales de la app.
- * Más adelante (Fase 4) van a coincidir con las tablas de la base de datos.
+ * Tipos principales de la app. Coinciden con lo que devuelve la API (ver api/README.md).
  */
 
 /** Un ejercicio dentro de una rutina, con lo que planeas hacer. */
@@ -34,3 +33,42 @@ export type AuthResponse = {
 
 /** Los datos para crear o editar una rutina (todo menos el id, que se genera solo). */
 export type RoutineInput = Omit<Routine, 'id'>;
+
+/** Una serie hecha: peso (kg) y repeticiones. */
+export type PerformedSet = {
+  weight: number;
+  reps: number;
+};
+
+/** Lo que se envía a la API al terminar un entrenamiento (solo las series marcadas). */
+export type WorkoutInput = {
+  routineId: string | null;
+  routineName: string;
+  startedAt: string; // fecha ISO
+  finishedAt: string;
+  exercises: { name: string; sets: PerformedSet[] }[];
+};
+
+/** Un entrenamiento en la lista del historial. */
+export type WorkoutSummary = {
+  id: string;
+  routineName: string;
+  startedAt: string;
+  finishedAt: string;
+  exerciseCount: number;
+  setCount: number;
+  totalVolume: number; // suma de peso × reps, en kg
+};
+
+/** Un entrenamiento con todas sus series, para la pantalla de detalle. */
+export type WorkoutDetail = {
+  id: string;
+  routineId: string | null;
+  routineName: string;
+  startedAt: string;
+  finishedAt: string;
+  exercises: { name: string; sets: (PerformedSet & { setNumber: number })[] }[];
+};
+
+/** "La última vez": por nombre de ejercicio, cuándo fue y qué series hiciste. */
+export type LastPerformance = Record<string, { finishedAt: string; sets: PerformedSet[] }>;

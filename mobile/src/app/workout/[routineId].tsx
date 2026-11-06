@@ -11,13 +11,16 @@ import { Spacing } from '@/constants/theme';
 import {
   createWorkoutState,
   getProgress,
+  toWorkoutInput,
   workoutReducer,
   type ActiveExercise,
 } from '@/features/workout/workout-reducer';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
 import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
+import { useLastPerformanceQuery, useSaveWorkout } from '@/hooks/use-workouts';
 import type { Routine } from '@/types';
+import { formatRelativeDay, formatSets } from '@/utils/format';
 
 /**
  * Pantalla del entrenamiento en curso: /workout/<id de la rutina>.
@@ -43,6 +46,10 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
   const { completed, total } = getProgress(state);
   const progress = total > 0 ? completed / total : 0;
 
+  const saveWorkout = useSaveWorkout();
+  // "La última vez" de cada ejercicio de la rutina (si ya los hiciste antes)
+  const { data: lastPerformance } = useLastPerformanceQuery(routine.exercises.map((exercise) => exercise.name));
+
   function confirmCancel() {
     Alert.alert('Cancelar entrenamiento', 'Se perderá lo que registraste. ¿Salir?', [
       { text: 'Seguir entrenando', style: 'cancel' },
@@ -50,14 +57,27 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
     ]);
   }
 
+  /** Guarda en la API y, si sale bien, abre el detalle del entrenamiento guardado. */
   function finishWorkout() {
-    const duration = formatDuration(Date.now() - state.startedAt);
-    Alert.alert('¡Buen trabajo! 💪', `Hiciste ${completed} de ${total} series en ${duration}.`, [
-      { text: 'Listo', onPress: () => router.back() },
-    ]);
+    const finishedAt = Date.now();
+    const duration = formatDuration(finishedAt - state.startedAt);
+
+    saveWorkout.mutate(toWorkoutInput(state, finishedAt), {
+      onSuccess: ({ id }) => {
+        Alert.alert('¡Buen trabajo! 💪', `Hiciste ${completed} de ${total} series en ${duration}.`);
+        // replace: "atrás" desde el detalle vuelve a la rutina, no al entrenamiento terminado
+        router.replace({ pathname: '/workout-detail/[id]', params: { id } });
+      },
+      onError: (error) =>
+        Alert.alert('No se pudo guardar', `${error.message}\n\nTu entrenamiento sigue aquí.`, [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Reintentar', onPress: finishWorkout },
+        ]),
+    });
   }
 
   function confirmFinish() {
+    if (saveWorkout.isPending) return;
     if (completed === 0) {
       Alert.alert('Sin series marcadas', 'Marca al menos una serie antes de terminar.');
       return;
@@ -97,7 +117,7 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
           headerRight: () => (
             <Pressable accessibilityRole="button" hitSlop={12} onPress={confirmFinish}>
               <ThemedText type="smallBold" themeColor="primary" style={styles.headerAction}>
-                Terminar
+                {saveWorkout.isPending ? 'Guardando...' : 'Terminar'}
               </ThemedText>
             </Pressable>
           ),
@@ -140,12 +160,18 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
         {/* Un bloque por ejercicio */}
         {state.exercises.map((exercise) => {
           const done = exercise.sets.length > 0 && exercise.sets.every((set) => set.completed);
+          const last = lastPerformance?.[exercise.name];
           return (
             <ThemedView key={exercise.id} type="backgroundElement" style={styles.card}>
               <ThemedText type="smallBold" themeColor={done ? 'primary' : 'text'} style={styles.exerciseName}>
                 {done ? '✓ ' : ''}
                 {exercise.name}
               </ThemedText>
+              {last && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  Última vez ({formatRelativeDay(last.finishedAt)}): {formatSets(last.sets)}
+                </ThemedText>
+              )}
 
               <SetRowHeader />
               {exercise.sets.map((set, index) => (
@@ -178,7 +204,11 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
           Mantén presionado el número de una serie para quitarla.
         </ThemedText>
 
-        <Button title="Terminar entrenamiento" onPress={confirmFinish} />
+        <Button
+          title={saveWorkout.isPending ? 'Guardando...' : 'Terminar entrenamiento'}
+          disabled={saveWorkout.isPending}
+          onPress={confirmFinish}
+        />
       </ScrollView>
     </ThemedView>
   );

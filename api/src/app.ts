@@ -3,7 +3,9 @@ import express from 'express';
 import { errorHandler, notFound } from './middleware/error-handler.ts';
 import { requireAuth } from './middleware/require-auth.ts';
 import { authRouter } from './routes/auth.ts';
+import { exercisesRouter } from './routes/exercises.ts';
 import { routinesRouter } from './routes/routines.ts';
+import { workoutsRouter } from './routes/workouts.ts';
 
 /**
  * Crea la app de Express (sin ponerla a escuchar).
@@ -23,6 +25,8 @@ export function createApp() {
   app.use('/auth', authRouter);
   // requireAuth va antes: todas las rutas de /routines necesitan login
   app.use('/routines', requireAuth, routinesRouter);
+  app.use('/workouts', requireAuth, workoutsRouter);
+  app.use('/exercises', requireAuth, exercisesRouter);
 
   // Siempre al final: rutas inexistentes y errores
   app.use(notFound);

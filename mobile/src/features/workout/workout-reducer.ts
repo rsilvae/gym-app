@@ -1,4 +1,4 @@
-import type { Routine } from '@/types';
+import type { Routine, WorkoutInput } from '@/types';
 import { createId } from '@/utils/id';
 
 /**
@@ -106,6 +106,33 @@ export function workoutReducer(state: WorkoutState, action: WorkoutAction): Work
         sets: exercise.sets.filter((set) => set.id !== action.setId),
       }));
   }
+}
+
+/** Convierte texto a número (acepta "62,5"). Si no es un número válido ≥ 0, devuelve 0. */
+function toNumber(text: string): number {
+  const value = Number(text.trim().replace(',', '.'));
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+/**
+ * Arma lo que se envía a la API al terminar: solo las series MARCADAS
+ * (lo que realmente hiciste). Los ejercicios sin series marcadas no se envían.
+ */
+export function toWorkoutInput(state: WorkoutState, finishedAt: number): WorkoutInput {
+  return {
+    routineId: state.routineId,
+    routineName: state.routineName,
+    startedAt: new Date(state.startedAt).toISOString(),
+    finishedAt: new Date(finishedAt).toISOString(),
+    exercises: state.exercises
+      .map((exercise) => ({
+        name: exercise.name,
+        sets: exercise.sets
+          .filter((set) => set.completed)
+          .map((set) => ({ weight: toNumber(set.weight), reps: Math.round(toNumber(set.reps)) })),
+      }))
+      .filter((exercise) => exercise.sets.length > 0),
+  };
 }
 
 /** Cuenta series hechas y totales, para la barra de progreso. */

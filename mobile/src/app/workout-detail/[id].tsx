@@ -1,0 +1,141 @@
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+
+import { Button } from '@/components/button';
+import { ErrorView, LoadingView } from '@/components/query-status';
+import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
+import { Spacing } from '@/constants/theme';
+import { formatDuration } from '@/hooks/use-elapsed-time';
+import { useDeleteWorkout, useWorkoutQuery } from '@/hooks/use-workouts';
+import { formatDate, formatNumber, formatTime } from '@/utils/format';
+
+/** Detalle de un entrenamiento terminado: cada ejercicio con sus series. */
+export default function WorkoutDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { data: workout, isPending, error, refetch } = useWorkoutQuery(id);
+  const deleteWorkout = useDeleteWorkout();
+
+  if (isPending) return <LoadingView />;
+  if (error) return <ErrorView error={error} onRetry={refetch} />;
+
+  const duration = formatDuration(
+    new Date(workout.finishedAt).getTime() - new Date(workout.startedAt).getTime(),
+  );
+  const allSets = workout.exercises.flatMap((exercise) => exercise.sets);
+  const totalVolume = allSets.reduce((total, set) => total + set.weight * set.reps, 0);
+
+  function confirmDelete() {
+    Alert.alert('Eliminar entrenamiento', 'Se borrará del historial. ¿Continuar?', [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () =>
+          deleteWorkout.mutate(id, {
+            onSuccess: () => router.back(),
+            onError: (err) => Alert.alert('No se pudo eliminar', err.message),
+          }),
+      },
+    ]);
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      <Stack.Screen options={{ title: workout.routineName }} />
+
+      <ScrollView contentContainerStyle={styles.content} contentInsetAdjustmentBehavior="automatic">
+        {/* Resumen */}
+        <ThemedView type="backgroundElement" style={styles.card}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {formatDate(workout.finishedAt)} · {formatTime(workout.startedAt)} – {formatTime(workout.finishedAt)}
+          </ThemedText>
+          <View style={styles.stats}>
+            <Stat label="Duración" value={duration} />
+            <Stat label="Series" value={String(allSets.length)} />
+            <Stat label="Volumen" value={`${formatNumber(totalVolume)} kg`} />
+          </View>
+        </ThemedView>
+
+        {/* Ejercicios */}
+        {workout.exercises.map((exercise, index) => (
+          <ThemedView key={`${exercise.name}-${index}`} type="backgroundElement" style={styles.card}>
+            <ThemedText type="smallBold" style={styles.exerciseName}>
+              {exercise.name}
+            </ThemedText>
+            {exercise.sets.map((set) => (
+              <View key={set.setNumber} style={styles.setRow}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.setNumber}>
+                  {set.setNumber}
+                </ThemedText>
+                <ThemedText type="small" style={styles.setValue}>
+                  {set.weight > 0 ? `${formatNumber(set.weight)} kg` : 'Peso corporal'}
+                </ThemedText>
+                <ThemedText type="small" style={styles.setValue}>
+                  {set.reps} reps
+                </ThemedText>
+              </View>
+            ))}
+          </ThemedView>
+        ))}
+
+        <Button
+          title={deleteWorkout.isPending ? 'Eliminando...' : 'Eliminar entrenamiento'}
+          variant="danger"
+          disabled={deleteWorkout.isPending}
+          onPress={confirmDelete}
+        />
+      </ScrollView>
+    </ThemedView>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={styles.stat}>
+      <ThemedText type="small" themeColor="textSecondary">
+        {label}
+      </ThemedText>
+      <ThemedText type="smallBold">{value}</ThemedText>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  content: {
+    padding: Spacing.three,
+    gap: Spacing.three,
+    paddingBottom: Spacing.six,
+  },
+  card: {
+    padding: Spacing.three,
+    borderRadius: 16,
+    gap: Spacing.two,
+  },
+  stats: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  stat: {
+    flex: 1,
+  },
+  exerciseName: {
+    fontSize: 18,
+    lineHeight: 24,
+  },
+  setRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+  },
+  setNumber: {
+    width: 20,
+    textAlign: 'center',
+  },
+  setValue: {
+    flex: 1,
+  },
+});

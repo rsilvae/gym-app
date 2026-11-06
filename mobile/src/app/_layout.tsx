@@ -70,6 +70,7 @@ function RootNavigator() {
           name="workout/[routineId]"
           options={{ title: 'Entrenamiento', gestureEnabled: false, headerBackVisible: false }}
         />
+        <Stack.Screen name="workout-detail/[id]" options={{ title: 'Entrenamiento', headerBackTitle: 'Atrás' }} />
       </Stack.Protected>
 
       {/* Al iniciar sesión → la lista de rutinas */}
