@@ -65,7 +65,11 @@ En cada push, **GitHub Actions** corre los tipos y los tests de la API contra un
 
 ## Deploy
 
-La API se publica en **Render** con [`render.yaml`](render.yaml): en cada push a `main` se compila, se aplican las migraciones pendientes y se reinicia. La base de datos está en **Neon** (misma región, us-east-1).
+La API está publicada en **Render**: https://gym-api-cc6g.onrender.com/health
+
+Se configura con [`render.yaml`](render.yaml): en cada push a `main` se compila, se aplican las migraciones pendientes y se reinicia. La base de datos está en **Neon** (misma región, us-east-1). Las migraciones usan la conexión directa de Neon (no la del pooler), porque Prisma Migrate necesita un bloqueo de sesión.
+
+> En el plan gratuito de Render el servidor se suspende tras 15 min sin uso: la primera petición puede tardar ~50 s.
 
 ## Roadmap
 
