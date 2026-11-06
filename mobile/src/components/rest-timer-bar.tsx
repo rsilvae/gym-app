@@ -16,7 +16,7 @@ export function RestTimerBar({ timer }: { timer: RestTimer }) {
 
   if (!timer.isRunning) return null;
 
-  const progress = Math.min(1, timer.remainingMs / (timer.restSeconds * 1000));
+  const progress = timer.remainingFraction;
   // Redondeamos hacia arriba: con 0,4 s restantes se ve "00:01", no "00:00"
   const remaining = formatDuration(Math.ceil(timer.remainingMs / 1000) * 1000);
 
@@ -38,8 +38,8 @@ export function RestTimerBar({ timer }: { timer: RestTimer }) {
           </ThemedText>
         </View>
         <View style={styles.actions}>
-          <Button title="−15" variant="secondary" compact onPress={() => timer.adjust(-15)} />
-          <Button title="+15" variant="secondary" compact onPress={() => timer.adjust(15)} />
+          <Button title="−15" variant="secondary" compact onPress={() => timer.adjustCurrent(-15)} />
+          <Button title="+15" variant="secondary" compact onPress={() => timer.adjustCurrent(15)} />
           <Button title="Saltar" compact onPress={timer.skip} />
         </View>
       </View>

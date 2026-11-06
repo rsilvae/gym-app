@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { ErrorView, LoadingView } from '@/components/query-status';
+import { RestDurationField } from '@/components/rest-duration-field';
 import { RestTimerBar } from '@/components/rest-timer-bar';
 import { SetRow, SetRowHeader } from '@/components/set-row';
 import { ThemedText } from '@/components/themed-text';
@@ -18,7 +19,7 @@ import {
   type ActiveExercise,
 } from '@/features/workout/workout-reducer';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
-import { MAX_REST_SECONDS, MIN_REST_SECONDS, useRestTimer } from '@/hooks/use-rest-timer';
+import { useRestTimer } from '@/hooks/use-rest-timer';
 import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
 import { useLastPerformanceQuery, useSaveWorkout } from '@/hooks/use-workouts';
@@ -175,27 +176,7 @@ function ActiveWorkout({ routine }: { routine: Routine }) {
             <ThemedText type="small" themeColor="textSecondary">
               Descanso entre series
             </ThemedText>
-            <View style={styles.restControls}>
-              <Button
-                title="−"
-                variant="secondary"
-                compact
-                accessibilityLabel="Bajar 15 segundos de descanso"
-                disabled={restTimer.restSeconds <= MIN_REST_SECONDS}
-                onPress={() => restTimer.adjust(-15)}
-              />
-              <ThemedText type="smallBold" style={styles.restValue}>
-                {formatDuration(restTimer.restSeconds * 1000)}
-              </ThemedText>
-              <Button
-                title="+"
-                variant="secondary"
-                compact
-                accessibilityLabel="Subir 15 segundos de descanso"
-                disabled={restTimer.restSeconds >= MAX_REST_SECONDS}
-                onPress={() => restTimer.adjust(15)}
-              />
-            </View>
+            <RestDurationField seconds={restTimer.restSeconds} onChange={restTimer.setDefaultRest} />
           </View>
         </ThemedView>
 
@@ -275,16 +256,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: Spacing.one,
-  },
-  restControls: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  restValue: {
-    minWidth: 48,
-    textAlign: 'center',
-    fontVariant: ['tabular-nums'],
   },
   headerAction: {
     fontSize: 16,
