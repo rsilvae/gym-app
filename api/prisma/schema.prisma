@@ -1,0 +1,36 @@
+// Schema de Prisma: aquí se definen las tablas de la base de datos.
+// Después de cambiarlo, corre `npm run db:migrate` para crear una migración
+// (un archivo SQL con los cambios) y aplicarla a la base.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/// Una rutina de entrenamiento (ej: "Pecho y tríceps").
+model Routine {
+  id        String            @id @default(cuid())
+  name      String
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  exercises RoutineExercise[]
+}
+
+/// Un ejercicio dentro de una rutina, con su objetivo.
+model RoutineExercise {
+  id           String  @id @default(cuid())
+  routineId    String
+  // onDelete: Cascade → si borras la rutina, se borran sus ejercicios.
+  routine      Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  name         String
+  order        Int // posición en la rutina (0, 1, 2...)
+  targetSets   Int
+  targetReps   Int
+  targetWeight Float   @default(0) // kg; 0 = peso corporal
+
+  @@index([routineId])
+}
