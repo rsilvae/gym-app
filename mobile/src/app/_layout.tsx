@@ -59,7 +59,8 @@ function RootNavigator() {
 
   return (
     <Stack>
-      <Stack.Protected guard={isSignedIn}>
+      {/* redirectTo: a dónde ir cuando el guard se vuelve false (al cerrar sesión → login) */}
+      <Stack.Protected guard={isSignedIn} redirectTo="/login">
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="routine/[id]" options={{ title: 'Rutina', headerBackTitle: 'Rutinas' }} />
         <Stack.Screen name="routine/new" options={{ title: 'Nueva rutina', headerBackTitle: 'Cancelar' }} />
@@ -71,7 +72,8 @@ function RootNavigator() {
         />
       </Stack.Protected>
 
-      <Stack.Protected guard={!isSignedIn}>
+      {/* Al iniciar sesión → la lista de rutinas */}
+      <Stack.Protected guard={!isSignedIn} redirectTo="/">
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
     </Stack>
