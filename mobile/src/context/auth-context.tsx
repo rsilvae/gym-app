@@ -23,8 +23,8 @@ type AuthContextValue = AuthState & {
   signUp: (input: RegisterInput) => Promise<void>;
   /** Confirma el código del email e inicia sesión. */
   verifyEmail: (email: string, code: string) => Promise<void>;
-  /** Cambia la contraseña con el código de "Olvidé mi contraseña" e inicia sesión. */
-  resetPassword: (email: string, code: string, password: string) => Promise<void>;
+  /** Inicia sesión con un token que ya se obtuvo (por ejemplo, tras cambiar la contraseña). */
+  startSession: (response: AuthResponse) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -58,10 +58,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function verifyEmail(email: string, code: string) {
     await startSession(await authApi.verifyEmail(email, code));
-  }
-
-  async function resetPassword(email: string, code: string, password: string) {
-    await startSession(await authApi.resetPassword(email, code, password));
   }
 
   // Al abrir la app: recupera la sesión guardada (si hay) y la valida con la API.
@@ -98,7 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, resetPassword, signOut }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, startSession, signOut }}>
       {children}
     </AuthContext.Provider>
   );

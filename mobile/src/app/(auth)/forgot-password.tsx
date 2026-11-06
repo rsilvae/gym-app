@@ -12,20 +12,24 @@ import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/context/auth-context';
 import { useCountdown } from '@/hooks/use-countdown';
 import { authApi } from '@/lib/auth-api';
+import type { AuthResponse } from '@/types';
 
 const RESEND_SECONDS = 60;
 
 /**
- * "Olvidé mi contraseña", en dos pasos:
+ * "Olvidé mi contraseña", en tres pasos:
  *  1. Escribes tu email y te llega un código.
- *  2. Escribes el código y tu contraseña nueva → quedas con la sesión iniciada.
+ *  2. Escribes el código y tu contraseña nueva.
+ *  3. Pantalla de confirmación → al tocar el botón quedas con la sesión iniciada.
  */
 export default function ForgotPasswordScreen() {
   const params = useLocalSearchParams<{ email?: string }>();
-  const { resetPassword } = useAuth();
+  const { startSession } = useAuth();
   const resendTimer = useCountdown(RESEND_SECONDS);
 
-  const [step, setStep] = useState<'email' | 'reset'>('email');
+  const [step, setStep] = useState<'email' | 'reset' | 'done'>('email');
+  // La API ya devolvió el token; lo guardamos hasta que toque "Ir a mis rutinas"
+  const [session, setSession] = useState<AuthResponse | null>(null);
   const [email, setEmail] = useState(params.email ?? '');
   const [code, setCode] = useState('');
   const [password, setPassword] = useState('');
@@ -74,12 +78,48 @@ export default function ForgotPasswordScreen() {
     setIsSubmitting(true);
     setError(null);
     try {
-      await resetPassword(normalizedEmail, code, password);
-      // Al iniciar sesión, el layout muestra la app solo
+      setSession(await authApi.resetPassword(normalizedEmail, code, password));
+      setStep('done');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Algo salió mal.');
+    } finally {
       setIsSubmitting(false);
     }
+  }
+
+  async function enterApp() {
+    if (!session) return;
+    setIsSubmitting(true);
+    // Al iniciar sesión, el layout muestra la app solo
+    await startSession(session);
+  }
+
+  if (step === 'done') {
+    return (
+      <ThemedView style={styles.container}>
+        <SafeAreaView style={styles.container}>
+          <ThemedView style={styles.content}>
+            <ThemedText type="title" style={styles.center}>
+              ✅
+            </ThemedText>
+            <ThemedText type="subtitle" style={styles.center}>
+              ¡Contraseña cambiada!
+            </ThemedText>
+            <ThemedText themeColor="textSecondary" style={styles.center}>
+              Tu contraseña se actualizó con éxito. Desde ahora usa la nueva para iniciar sesión.
+              {'\n\n'}
+              Te enviamos un email de aviso a{'\n'}
+              <ThemedText type="smallBold">{normalizedEmail}</ThemedText>
+            </ThemedText>
+            <Button
+              title={isSubmitting ? 'Entrando...' : 'Ir a mis rutinas'}
+              disabled={isSubmitting}
+              onPress={() => void enterApp()}
+            />
+          </ThemedView>
+        </SafeAreaView>
+      </ThemedView>
+    );
   }
 
   return (
