@@ -19,5 +19,18 @@ export type Routine = {
   exercises: RoutineExercise[];
 };
 
+/** El usuario que inició sesión (lo que devuelve la API, sin contraseña). */
+export type User = {
+  id: string;
+  email: string;
+  createdAt: string;
+};
+
+/** Respuesta de /auth/login y /auth/register. */
+export type AuthResponse = {
+  token: string;
+  user: User;
+};
+
 /** Los datos para crear o editar una rutina (todo menos el id, que se genera solo). */
 export type RoutineInput = Omit<Routine, 'id'>;

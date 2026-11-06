@@ -11,13 +11,26 @@ datasource db {
   provider = "postgresql"
 }
 
-/// Una rutina de entrenamiento (ej: "Pecho y tríceps").
+/// Un usuario de la app. Nunca guardamos la contraseña: solo su hash (bcrypt).
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  routines     Routine[]
+}
+
+/// Una rutina de entrenamiento (ej: "Pecho y tríceps"). Pertenece a un usuario.
 model Routine {
   id        String            @id @default(cuid())
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   name      String
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
   exercises RoutineExercise[]
+
+  @@index([userId])
 }
 
 /// Un ejercicio dentro de una rutina, con su objetivo.

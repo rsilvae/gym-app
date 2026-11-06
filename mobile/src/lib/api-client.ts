@@ -30,15 +30,36 @@ export class ApiError extends Error {
 }
 
 /**
- * fetch con lo que siempre necesitamos: URL base, JSON y errores claros.
+ * Token de la sesión actual. Lo maneja AuthProvider (auth-context.tsx):
+ * se guarda aquí en memoria para agregarlo a cada petición.
+ */
+let authToken: string | null = null;
+let onUnauthorized: (() => void) | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
+/** Qué hacer si la API dice 401 (token vencido o inválido): normalmente, cerrar sesión. */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
+/**
+ * fetch con lo que siempre necesitamos: URL base, JSON, token y errores claros.
  * Ejemplo: apiFetch<Routine[]>('/routines')
  */
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const sentToken = authToken;
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       ...options,
-      headers: { 'Content-Type': 'application/json', ...options.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(sentToken ? { Authorization: `Bearer ${sentToken}` } : {}),
+        ...options.headers,
+      },
     });
   } catch {
     throw new ApiError(
@@ -51,6 +72,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   if (response.status === 204) return undefined as T;
 
   const body = await response.json().catch(() => null);
+
+  // Mandamos un token y la API lo rechazó → la sesión ya no sirve
+  if (response.status === 401 && sentToken) {
+    onUnauthorized?.();
+  }
+
   if (!response.ok) {
     throw new ApiError(response.status, body?.error ?? `Error ${response.status}`);
   }

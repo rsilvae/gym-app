@@ -1,6 +1,8 @@
 import express from 'express';
 
 import { errorHandler, notFound } from './middleware/error-handler.ts';
+import { requireAuth } from './middleware/require-auth.ts';
+import { authRouter } from './routes/auth.ts';
 import { routinesRouter } from './routes/routines.ts';
 
 /**
@@ -18,7 +20,9 @@ export function createApp() {
     res.json({ status: 'ok' });
   });
 
-  app.use('/routines', routinesRouter);
+  app.use('/auth', authRouter);
+  // requireAuth va antes: todas las rutas de /routines necesitan login
+  app.use('/routines', requireAuth, routinesRouter);
 
   // Siempre al final: rutas inexistentes y errores
   app.use(notFound);

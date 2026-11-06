@@ -1,13 +1,13 @@
 # Gym API
 
-API REST de Gym App hecha con **Node.js, Express 5, TypeScript, PostgreSQL y Prisma 7**. Valida los datos con **Zod**.
+API REST de Gym App hecha con **Node.js, Express 5, TypeScript, PostgreSQL y Prisma 7**. Valida los datos con **Zod** y autentica con **JWT** (contraseñas con **bcrypt**).
 
 ## Cómo correrla
 
 ```bash
 cd api
 npm install
-cp .env.example .env      # y completa DATABASE_URL
+cp .env.example .env      # y completa DATABASE_URL y JWT_SECRET
 npm run db:migrate        # crea las tablas en la base de datos
 npm run dev               # http://localhost:3000
 ```
@@ -27,11 +27,16 @@ npm run dev               # http://localhost:3000
 | Método | Ruta | Descripción |
 |---|---|---|
 | GET | `/health` | Estado del servidor |
-| GET | `/routines` | Lista las rutinas |
-| GET | `/routines/:id` | Una rutina con sus ejercicios |
-| POST | `/routines` | Crea una rutina |
-| PUT | `/routines/:id` | Reemplaza nombre y ejercicios |
-| DELETE | `/routines/:id` | Elimina una rutina |
+| POST | `/auth/register` | Crea una cuenta → `{ token, user }` |
+| POST | `/auth/login` | Inicia sesión → `{ token, user }` |
+| GET | `/auth/me` 🔒 | Usuario actual |
+| GET | `/routines` 🔒 | Lista tus rutinas |
+| GET | `/routines/:id` 🔒 | Una rutina con sus ejercicios |
+| POST | `/routines` 🔒 | Crea una rutina |
+| PUT | `/routines/:id` 🔒 | Reemplaza nombre y ejercicios |
+| DELETE | `/routines/:id` 🔒 | Elimina una rutina |
+
+🔒 = requiere el header `Authorization: Bearer <token>`. Cada usuario solo ve y modifica sus propias rutinas (las de otro responden 404).
 
 Ejemplo de body para `POST /routines`:
 
@@ -55,7 +60,8 @@ src/
   db.ts             # cliente de Prisma
   routes/           # endpoints
   schemas/          # validaciones con Zod
-  middleware/       # 404 y manejo de errores
+  middleware/       # login requerido, 404 y manejo de errores
+  utils/auth.ts     # hash de contraseñas y tokens JWT
 prisma/
   schema.prisma     # modelos (tablas)
   migrations/       # historial de cambios de la base

@@ -9,6 +9,10 @@ import { z } from 'zod';
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'Falta DATABASE_URL en el archivo .env'),
   PORT: z.coerce.number().int().positive().default(3000),
+  // Clave secreta para firmar los tokens de login. Debe ser larga y aleatoria.
+  JWT_SECRET: z.string().min(32, 'JWT_SECRET debe tener al menos 32 caracteres'),
+  // Cuánto dura una sesión antes de tener que volver a iniciar sesión (ej: "7d", "12h").
+  JWT_EXPIRES_IN: z.string().default('7d'),
 });
 
 const result = envSchema.safeParse(process.env);
