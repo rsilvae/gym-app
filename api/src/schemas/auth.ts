@@ -40,3 +40,8 @@ export const verifyEmailSchema = z.object({ email, code });
 export const emailOnlySchema = z.object({ email });
 
 export const resetPasswordSchema = z.object({ email, code, password: newPassword });
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1, 'Escribe tu contraseña actual').max(72),
+  newPassword,
+});

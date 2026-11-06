@@ -25,6 +25,10 @@ type AuthContextValue = AuthState & {
   verifyEmail: (email: string, code: string) => Promise<void>;
   /** Inicia sesión con un token que ya se obtuvo (por ejemplo, tras cambiar la contraseña). */
   startSession: (response: AuthResponse) => Promise<void>;
+  /** Cambia la contraseña: este celular sigue adentro y los demás quedan afuera. */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** Cierra la sesión en todos los dispositivos, incluido este. */
+  signOutEverywhere: () => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -58,6 +62,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function verifyEmail(email: string, code: string) {
     await startSession(await authApi.verifyEmail(email, code));
+  }
+
+  async function changePassword(currentPassword: string, newPassword: string) {
+    // La API devuelve un token nuevo; lo guardamos en vez del anterior
+    await startSession(await authApi.changePassword(currentPassword, newPassword));
+  }
+
+  async function signOutEverywhere() {
+    await authApi.logoutAll();
+    await signOut();
   }
 
   // Al abrir la app: recupera la sesión guardada (si hay) y la valida con la API.
@@ -94,7 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, startSession, signOut }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, startSession, changePassword, signOutEverywhere, signOut }}>
       {children}
     </AuthContext.Provider>
   );

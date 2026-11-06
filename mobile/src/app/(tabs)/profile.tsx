@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { Alert, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -9,7 +10,7 @@ import { useAuth } from '@/context/auth-context';
 
 /** Pestaña "Perfil": datos de la cuenta y cerrar sesión. */
 export default function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, signOutEverywhere } = useAuth();
 
   const memberSince = user
     ? new Date(user.createdAt).toLocaleDateString('es', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -20,6 +21,24 @@ export default function ProfileScreen() {
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Cerrar sesión', style: 'destructive', onPress: () => void signOut() },
     ]);
+  }
+
+  function confirmSignOutEverywhere() {
+    Alert.alert(
+      'Cerrar sesión en todos los dispositivos',
+      'Se cerrará la sesión en todos los celulares donde hayas entrado, incluido este.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Cerrar en todos',
+          style: 'destructive',
+          onPress: () =>
+            void signOutEverywhere().catch((err: unknown) =>
+              Alert.alert('No se pudo cerrar la sesión', err instanceof Error ? err.message : 'Algo salió mal.'),
+            ),
+        },
+      ],
+    );
   }
 
   return (
@@ -49,6 +68,12 @@ export default function ProfileScreen() {
           <ThemedText type="smallBold">{memberSince}</ThemedText>
         </ThemedView>
 
+        <Button title="Cambiar contraseña" variant="secondary" onPress={() => router.push('/change-password')} />
+        <Button
+          title="Cerrar sesión en todos los dispositivos"
+          variant="secondary"
+          onPress={confirmSignOutEverywhere}
+        />
         <Button title="Cerrar sesión" variant="danger" onPress={confirmSignOut} />
       </SafeAreaView>
     </ThemedView>

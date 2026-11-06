@@ -5,6 +5,7 @@ import { Prisma } from '../generated/prisma/client.ts';
 import type { AuthLimiters } from '../middleware/rate-limit.ts';
 import { getUserId, requireAuth } from '../middleware/require-auth.ts';
 import {
+  changePasswordSchema,
   emailOnlySchema,
   loginSchema,
   registerSchema,
@@ -32,10 +33,22 @@ import { validate } from '../utils/validate.ts';
  *   POST /auth/reset-password  → código + contraseña nueva; devuelve { token, user }
  *   POST /auth/login        → con email o usuario; devuelve { token, user }
  *   GET  /auth/me           → el usuario del token (requiere login)
+ *   POST /auth/change-password → contraseña actual + nueva; cierra las demás sesiones (requiere login)
+ *   POST /auth/logout-all   → cierra la sesión en todos los dispositivos (requiere login)
  */
 
 /** Campos públicos del usuario: nunca devolvemos el passwordHash. */
 const publicUser = { id: true, email: true, username: true, createdAt: true } as const;
+
+/** Lo público + la versión de sesión, que hace falta para crear el token. */
+const sessionUser = { ...publicUser, tokenVersion: true } as const;
+
+type SessionUser = { id: string; email: string; username: string; createdAt: Date; tokenVersion: number };
+
+/** Respuesta de login: el token y el usuario (sin la versión de sesión, que es interna). */
+function authResponse({ tokenVersion, ...user }: SessionUser) {
+  return { token: createToken({ id: user.id, tokenVersion }), user };
+}
 
 /**
  * Hash de una contraseña cualquiera. Si el usuario no existe, igual comparamos contra
@@ -106,9 +119,9 @@ export function createAuthRouter(limiters: AuthLimiters) {
     const verified = await prisma.user.update({
       where: { id: user.id },
       data: { emailVerifiedAt: new Date() },
-      select: publicUser,
+      select: sessionUser,
     });
-    res.json({ token: createToken(verified.id), user: verified });
+    res.json(authResponse(verified));
   });
 
   router.post('/resend-code', limiters.resend, async (req, res) => {
@@ -147,14 +160,16 @@ export function createAuthRouter(limiters: AuthLimiters) {
         passwordHash: await hashPassword(password),
         // Recibir el código ya demuestra que el email es suyo
         emailVerifiedAt: user.emailVerifiedAt ?? new Date(),
+        // Cierra todas las sesiones abiertas: si alguien tenía la contraseña vieja, queda afuera
+        tokenVersion: { increment: 1 },
       },
-      select: publicUser,
+      select: sessionUser,
     });
     // Ya no hace falta un código de verificación pendiente (si había)
     await prisma.emailCode.deleteMany({ where: { userId: user.id } });
     await sendEmail(passwordChangedEmail(user.email));
 
-    res.json({ token: createToken(updated.id), user: updated });
+    res.json(authResponse(updated));
   });
 
   router.post('/login', limiters.login, async (req, res) => {
@@ -180,10 +195,8 @@ export function createAuthRouter(limiters: AuthLimiters) {
       });
     }
 
-    res.json({
-      token: createToken(user.id),
-      user: { id: user.id, email: user.email, username: user.username, createdAt: user.createdAt },
-    });
+    const { id, email, username, createdAt, tokenVersion } = user;
+    res.json(authResponse({ id, email, username, createdAt, tokenVersion }));
   });
 
   router.get('/me', requireAuth, async (_req, res) => {
@@ -194,6 +207,36 @@ export function createAuthRouter(limiters: AuthLimiters) {
     // El token era válido pero el usuario ya no existe (por ejemplo, se borró)
     if (!user) throw new HttpError(401, 'Necesitas iniciar sesión');
     res.json(user);
+  });
+
+  router.post('/change-password', limiters.verify, requireAuth, async (req, res) => {
+    const { currentPassword, newPassword } = validate(changePasswordSchema, req.body);
+    const userId = getUserId(res.locals);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    // 400 y no 401: un 401 haría que la app cierre la sesión
+    if (!user || !(await verifyPassword(currentPassword, user.passwordHash))) {
+      throw new HttpError(400, 'La contraseña actual no es correcta');
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword(newPassword), tokenVersion: { increment: 1 } },
+      select: sessionUser,
+    });
+    await sendEmail(passwordChangedEmail(user.email));
+
+    // Los demás dispositivos quedan afuera; este recibe un token nuevo y sigue adentro
+    res.json(authResponse(updated));
+  });
+
+  router.post('/logout-all', requireAuth, async (_req, res) => {
+    await prisma.user.update({
+      where: { id: getUserId(res.locals) },
+      data: { tokenVersion: { increment: 1 } },
+    });
+    // Incluye este dispositivo: la app borra su sesión al recibir la respuesta
+    res.status(204).end();
   });
 
   return router;

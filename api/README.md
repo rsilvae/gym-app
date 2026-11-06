@@ -36,6 +36,8 @@ npm run dev               # http://localhost:3000
 | POST | `/auth/reset-password` | Código + contraseña nueva (`email`, `code`, `password`) → `{ token, user }`, y avisa por email |
 | POST | `/auth/login` | Inicia sesión con email **o** usuario (`identifier`, `password`) → `{ token, user }`; 403 si falta verificar el email |
 | GET | `/auth/me` 🔒 | Usuario actual |
+| POST | `/auth/change-password` 🔒 | Contraseña actual + nueva (`currentPassword`, `newPassword`) → `{ token, user }`; cierra las demás sesiones |
+| POST | `/auth/logout-all` 🔒 | Cierra la sesión en todos los dispositivos → 204 |
 | GET | `/routines` 🔒 | Lista tus rutinas |
 | GET | `/routines/:id` 🔒 | Una rutina con sus ejercicios |
 | POST | `/routines` 🔒 | Crea una rutina |
@@ -56,6 +58,7 @@ npm run dev               # http://localhost:3000
 - **Verificación de email:** código de 6 dígitos, guardado como hash (HMAC), vence en 15 min, máximo 5 intentos y sirve una sola vez.
 - **No revela qué emails están registrados:** registrarse con un email existente responde igual que uno nuevo, y al dueño le llega un aviso por email. El login da el mismo error si la cuenta no existe o la contraseña está mal (y tarda lo mismo).
 - **Límite de intentos por IP** (`express-rate-limit`): 10 logins fallidos cada 15 min, 10 registros por hora, 10 códigos cada 15 min, 5 reenvíos por hora.
+- **Cerrar sesiones a distancia:** cada token JWT lleva la versión de sesión del usuario (`tokenVersion`). Cambiar o restablecer la contraseña, o `logout-all`, la sube y los tokens anteriores dejan de servir (el middleware la compara en cada petición).
 - **Headers de seguridad** con `helmet`.
 - Emails enviados con la API de **Brevo** (`BREVO_API_KEY`, `EMAIL_FROM`); en local, sin clave, se muestran en la terminal.
 

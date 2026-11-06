@@ -24,6 +24,12 @@ export const authApi = {
   login: (input: LoginInput) => post<AuthResponse>('/auth/login', input),
 
   me: () => apiFetch<User>('/auth/me'),
+
+  /** Devuelve un token nuevo: el viejo (y el de los otros dispositivos) deja de servir. */
+  changePassword: (currentPassword: string, newPassword: string) =>
+    post<AuthResponse>('/auth/change-password', { currentPassword, newPassword }),
+
+  logoutAll: () => post<void>('/auth/logout-all', {}),
 };
 
 /**

@@ -82,8 +82,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
   const body = await response.json().catch(() => null);
 
-  // Mandamos un token y la API lo rechazó → la sesión ya no sirve
-  if (response.status === 401 && sentToken) {
+  // Mandamos un token y la API lo rechazó → la sesión ya no sirve.
+  // Solo si sigue siendo el token actual: al cambiar la contraseña llega uno nuevo, y una
+  // petición que salió antes con el viejo no debe cerrar la sesión.
+  if (response.status === 401 && sentToken && sentToken === authToken) {
     onUnauthorized?.();
   }
 

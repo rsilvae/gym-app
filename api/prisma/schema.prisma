@@ -20,6 +20,8 @@ model User {
   passwordHash    String
   /// Cuándo confirmó su email con el código. null = todavía no puede entrar.
   emailVerifiedAt DateTime?
+  /// Va dentro de cada token. Subirlo invalida todas las sesiones abiertas.
+  tokenVersion    Int         @default(0)
   createdAt       DateTime    @default(now())
   routines        Routine[]
   workouts        Workout[]

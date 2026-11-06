@@ -277,6 +277,18 @@ describe('Olvidé mi contraseña', () => {
     expect(user.emailVerifiedAt).not.toBeNull();
   });
 
+  it('cierra las sesiones que estaban abiertas', async () => {
+    const login = await request(app).post('/auth/login').send({ identifier: 'ana_fit', password: 'secreta123' });
+    const oldAuth = { Authorization: `Bearer ${login.body.token}` };
+
+    await forgot();
+    const response = await reset({ code: lastCodeFor('ana@test.com') });
+
+    expect((await request(app).get('/auth/me').set(oldAuth)).status).toBe(401);
+    const newAuth = { Authorization: `Bearer ${response.body.token}` };
+    expect((await request(app).get('/auth/me').set(newAuth)).status).toBe(200);
+  });
+
   it('valida la contraseña nueva', async () => {
     await forgot();
     const response = await reset({ code: lastCodeFor('ana@test.com'), password: 'corta' });
@@ -318,5 +330,80 @@ describe('GET /auth/me', () => {
     expect(noToken.status).toBe(401);
     expect(fakeToken.status).toBe(401);
     expect(tamperedToken.status).toBe(401);
+  });
+
+  it('rechaza el token de un usuario que ya no existe', async () => {
+    const { auth, user } = await createUser();
+    await prisma.user.delete({ where: { id: user.id } });
+    expect((await request(app).get('/auth/me').set(auth)).status).toBe(401);
+  });
+});
+
+describe('Cambiar contraseña y cerrar sesiones', () => {
+  /** Inicia sesión otra vez, como si fuera un segundo celular. */
+  async function secondDevice() {
+    const login = await request(app).post('/auth/login').send({ identifier: 'ana', password: 'secreta123' });
+    return { Authorization: `Bearer ${login.body.token}` };
+  }
+  const me = (auth: Record<string, string>) => request(app).get('/auth/me').set(auth);
+
+  it('cambia la contraseña: este dispositivo sigue adentro y los demás quedan afuera', async () => {
+    const { auth } = await createUser();
+    const otherDevice = await secondDevice();
+    outbox.length = 0;
+
+    const response = await request(app)
+      .post('/auth/change-password')
+      .set(auth)
+      .send({ currentPassword: 'secreta123', newPassword: 'clave-nueva-123' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.user).not.toHaveProperty('tokenVersion');
+    expect(outbox.at(-1)?.subject).toMatch(/contraseña .* cambió/i);
+
+    expect((await me({ Authorization: `Bearer ${response.body.token}` })).status).toBe(200);
+    expect((await me(auth)).status).toBe(401);
+    expect((await me(otherDevice)).status).toBe(401);
+
+    const login = await request(app).post('/auth/login').send({ identifier: 'ana', password: 'clave-nueva-123' });
+    expect(login.status).toBe(200);
+  });
+
+  it('con la contraseña actual incorrecta responde 400 (no 401) y no cambia nada', async () => {
+    const { auth } = await createUser();
+    const response = await request(app)
+      .post('/auth/change-password')
+      .set(auth)
+      .send({ currentPassword: 'equivocada', newPassword: 'clave-nueva-123' });
+
+    expect(response.status).toBe(400);
+    expect((await me(auth)).status).toBe(200);
+  });
+
+  it('valida la contraseña nueva y exige login', async () => {
+    const { auth } = await createUser();
+    const short = await request(app)
+      .post('/auth/change-password')
+      .set(auth)
+      .send({ currentPassword: 'secreta123', newPassword: 'corta' });
+    const noLogin = await request(app)
+      .post('/auth/change-password')
+      .send({ currentPassword: 'secreta123', newPassword: 'clave-nueva-123' });
+
+    expect(short.status).toBe(400);
+    expect(short.body.details.fieldErrors).toHaveProperty('newPassword');
+    expect(noLogin.status).toBe(401);
+  });
+
+  it('logout-all cierra la sesión en todos los dispositivos', async () => {
+    const { auth } = await createUser();
+    const otherDevice = await secondDevice();
+
+    expect((await request(app).post('/auth/logout-all').set(auth)).status).toBe(204);
+    expect((await me(auth)).status).toBe(401);
+    expect((await me(otherDevice)).status).toBe(401);
+
+    // La contraseña sigue igual: se puede volver a entrar
+    expect((await me(await secondDevice())).status).toBe(200);
   });
 });
