@@ -1,0 +1,85 @@
+# CI: en cada push o pull request a main, GitHub revisa que todo funcione.
+# - api:    tipos + tests contra un PostgreSQL temporal
+# - mobile: tipos + lint de la app
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  api:
+    name: API (tipos y tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    # Un PostgreSQL de usar y tirar, solo para los tests
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: gym_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gym_test
+      # Para que `prisma migrate deploy` use la base de pruebas
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/gym_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Revisar tipos
+        run: npm run typecheck
+
+      - name: Crear tablas (migraciones)
+        run: npx prisma migrate deploy
+
+      - name: Correr tests
+        # DATABASE_URL igual a TEST_DATABASE_URL es seguro aquí: es la base temporal de CI
+        run: DATABASE_URL= npm test
+
+  mobile:
+    name: App (tipos y lint)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Revisar tipos
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx expo lint

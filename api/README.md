@@ -19,6 +19,8 @@ npm run dev               # http://localhost:3000
 | `npm run dev` | Servidor en modo desarrollo (se reinicia al guardar) |
 | `npm run build` / `npm start` | Compila a `dist/` y lo ejecuta (producción) |
 | `npm run typecheck` | Revisa los tipos |
+| `npm test` | Corre los tests (necesita `.env.test`, ver `.env.test.example`) |
+| `npm run db:deploy` | Aplica migraciones pendientes (producción) |
 | `npm run db:migrate` | Crea y aplica migraciones a partir de `prisma/schema.prisma` |
 | `npm run db:studio` | Abre Prisma Studio para ver los datos |
 

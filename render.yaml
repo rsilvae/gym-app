@@ -1,0 +1,25 @@
+# Render Blueprint: describe cómo publicar la API en https://render.com
+# Render lee este archivo y crea el servicio solo (New → Blueprint).
+services:
+  - type: web
+    name: gym-api
+    runtime: node
+    plan: free
+    region: virginia # misma región que la base de Neon (us-east-1)
+    rootDir: api
+    # Instala todo (incluye TypeScript y Prisma CLI) y compila a dist/
+    buildCommand: npm ci --include=dev && npm run build
+    # Aplica migraciones pendientes y arranca el servidor
+    startCommand: npx prisma migrate deploy && npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit # cada push a main vuelve a publicar
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: JWT_EXPIRES_IN
+        value: 7d
+      # Secretos: Render los pide al crear el servicio (no van en GitHub)
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true # Render genera una clave aleatoria
