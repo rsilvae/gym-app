@@ -6,6 +6,7 @@ import type { AuthLimiters } from '../middleware/rate-limit.ts';
 import { getUserId, requireAuth } from '../middleware/require-auth.ts';
 import {
   changePasswordSchema,
+  deleteAccountSchema,
   emailOnlySchema,
   loginSchema,
   registerSchema,
@@ -14,6 +15,7 @@ import {
 } from '../schemas/auth.ts';
 import { createToken, hashPassword, verifyPassword } from '../utils/auth.ts';
 import {
+  accountDeletedEmail,
   accountExistsEmail,
   passwordChangedEmail,
   passwordResetEmail,
@@ -35,6 +37,7 @@ import { validate } from '../utils/validate.ts';
  *   GET  /auth/me           → el usuario del token (requiere login)
  *   POST /auth/change-password → contraseña actual + nueva; cierra las demás sesiones (requiere login)
  *   POST /auth/logout-all   → cierra la sesión en todos los dispositivos (requiere login)
+ *   POST /auth/delete-account → con la contraseña, borra la cuenta y todos sus datos (requiere login)
  */
 
 /** Campos públicos del usuario: nunca devolvemos el passwordHash. */
@@ -236,6 +239,24 @@ export function createAuthRouter(limiters: AuthLimiters) {
       data: { tokenVersion: { increment: 1 } },
     });
     // Incluye este dispositivo: la app borra su sesión al recibir la respuesta
+    res.status(204).end();
+  });
+
+  // POST (y no DELETE) porque lleva la contraseña en el body
+  router.post('/delete-account', limiters.verify, requireAuth, async (req, res) => {
+    const { password } = validate(deleteAccountSchema, req.body);
+    const userId = getUserId(res.locals);
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    // Pedimos la contraseña: alguien con tu celular desbloqueado no puede borrarte la cuenta
+    if (!user || !(await verifyPassword(password, user.passwordHash))) {
+      throw new HttpError(400, 'La contraseña no es correcta');
+    }
+
+    // onDelete: Cascade en el schema → se borran también rutinas, entrenamientos, series y códigos
+    await prisma.user.delete({ where: { id: userId } });
+    await sendEmail(accountDeletedEmail(user.email));
+
     res.status(204).end();
   });
 

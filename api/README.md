@@ -38,6 +38,7 @@ npm run dev               # http://localhost:3000
 | GET | `/auth/me` 🔒 | Usuario actual |
 | POST | `/auth/change-password` 🔒 | Contraseña actual + nueva (`currentPassword`, `newPassword`) → `{ token, user }`; cierra las demás sesiones |
 | POST | `/auth/logout-all` 🔒 | Cierra la sesión en todos los dispositivos → 204 |
+| POST | `/auth/delete-account` 🔒 | Con la contraseña (`password`), borra la cuenta y todos sus datos → 204, y avisa por email |
 | GET | `/routines` 🔒 | Lista tus rutinas |
 | GET | `/routines/:id` 🔒 | Una rutina con sus ejercicios |
 | POST | `/routines` 🔒 | Crea una rutina |

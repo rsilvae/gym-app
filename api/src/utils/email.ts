@@ -94,6 +94,18 @@ export function passwordChangedEmail(to: string): Email {
   };
 }
 
+/** Confirmación de que la cuenta y todos sus datos se borraron. */
+export function accountDeletedEmail(to: string): Email {
+  return {
+    to,
+    subject: 'Tu cuenta de Gym App fue eliminada',
+    text: 'Tu cuenta de Gym App y todos sus datos (rutinas e historial de entrenamientos) se eliminaron.\n\nSi quieres volver, puedes crear una cuenta nueva cuando quieras.',
+    html: layout(
+      '<p>Tu cuenta de Gym App y <b>todos sus datos</b> (rutinas e historial de entrenamientos) se eliminaron.</p><p>Si quieres volver, puedes crear una cuenta nueva cuando quieras.</p>',
+    ),
+  };
+}
+
 /**
  * Alguien intentó crear una cuenta con un email que ya está registrado.
  * Se avisa al dueño por email en vez de decirlo en la respuesta de la API:

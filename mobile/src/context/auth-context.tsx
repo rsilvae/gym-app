@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { ApiError, setAuthToken, setUnauthorizedHandler } from '@/lib/api-client';
 import { authApi, type LoginInput, type RegisterInput } from '@/lib/auth-api';
 import { clearSession, loadSession, saveSession } from '@/lib/auth-storage';
+import { workoutDraftStorage } from '@/lib/workout-draft-storage';
 import type { AuthResponse, User } from '@/types';
 
 /**
@@ -29,6 +30,8 @@ type AuthContextValue = AuthState & {
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** Cierra la sesión en todos los dispositivos, incluido este. */
   signOutEverywhere: () => Promise<void>;
+  /** Borra la cuenta en la API y lo que quedó guardado en el celular, y cierra sesión. */
+  deleteAccount: (password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -74,6 +77,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut();
   }
 
+  async function deleteAccount(password: string) {
+    await authApi.deleteAccount(password);
+    // El borrador del entrenamiento en curso vive en el celular: también se borra
+    if (state.user) await workoutDraftStorage.clear(state.user.id).catch(() => undefined);
+    await signOut();
+  }
+
   // Al abrir la app: recupera la sesión guardada (si hay) y la valida con la API.
   useEffect(() => {
     async function restoreSession() {
@@ -108,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   return (
-    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, startSession, changePassword, signOutEverywhere, signOut }}>
+    <AuthContext.Provider value={{ ...state, signIn, signUp, verifyEmail, startSession, changePassword, signOutEverywhere, deleteAccount, signOut }}>
       {children}
     </AuthContext.Provider>
   );

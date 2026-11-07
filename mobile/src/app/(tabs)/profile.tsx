@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Alert, StyleSheet } from 'react-native';
+import { Alert, Pressable, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
@@ -75,6 +75,15 @@ export default function ProfileScreen() {
           onPress={confirmSignOutEverywhere}
         />
         <Button title="Cerrar sesión" variant="danger" onPress={confirmSignOut} />
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/delete-account')}
+          style={styles.deleteLink}>
+          <ThemedText type="small" style={styles.deleteText}>
+            Eliminar cuenta
+          </ThemedText>
+        </Pressable>
       </SafeAreaView>
     </ThemedView>
   );
@@ -96,5 +105,12 @@ const styles = StyleSheet.create({
   },
   label: {
     marginTop: Spacing.two,
+  },
+  deleteLink: {
+    alignSelf: 'center',
+    padding: Spacing.two,
+  },
+  deleteText: {
+    color: '#E5484D',
   },
 });

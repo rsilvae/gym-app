@@ -30,6 +30,9 @@ export const authApi = {
     post<AuthResponse>('/auth/change-password', { currentPassword, newPassword }),
 
   logoutAll: () => post<void>('/auth/logout-all', {}),
+
+  /** Borra la cuenta y todos sus datos. Pide la contraseña para confirmar. */
+  deleteAccount: (password: string) => post<void>('/auth/delete-account', { password }),
 };
 
 /**

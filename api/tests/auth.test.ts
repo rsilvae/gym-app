@@ -1,7 +1,17 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app.ts';
-import { app, createUser, lastCodeFor, outbox, prisma, request, resetDatabase } from './helpers.ts';
+import {
+  app,
+  createUser,
+  lastCodeFor,
+  outbox,
+  prisma,
+  request,
+  resetDatabase,
+  sampleRoutine,
+  sampleWorkout,
+} from './helpers.ts';
 
 beforeEach(resetDatabase);
 afterAll(() => prisma.$disconnect());
@@ -405,5 +415,49 @@ describe('Cambiar contraseña y cerrar sesiones', () => {
 
     // La contraseña sigue igual: se puede volver a entrar
     expect((await me(await secondDevice())).status).toBe(200);
+  });
+});
+
+describe('Eliminar cuenta', () => {
+  const deleteAccount = (auth: Record<string, string>, password: string) =>
+    request(app).post('/auth/delete-account').set(auth).send({ password });
+
+  it('borra la cuenta y todos sus datos, y avisa por email', async () => {
+    const { auth, user } = await createUser();
+    const routine = await request(app).post('/routines').set(auth).send(sampleRoutine);
+    const workout = await request(app).post('/workouts').set(auth).send(sampleWorkout({ routineId: routine.body.id }));
+    expect(workout.status).toBe(201);
+    // Otro usuario con sus datos: no se debe tocar
+    const beto = await createUser('beto@test.com');
+    expect((await request(app).post('/routines').set(beto.auth).send(sampleRoutine)).status).toBe(201);
+    outbox.length = 0;
+
+    expect((await deleteAccount(auth, 'secreta123')).status).toBe(204);
+
+    expect(await prisma.user.findUnique({ where: { id: user.id } })).toBeNull();
+    expect(await prisma.routine.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.workout.count({ where: { userId: user.id } })).toBe(0);
+    expect(await prisma.workoutSet.count()).toBe(0);
+    expect(await prisma.routine.count({ where: { userId: beto.user.id } })).toBe(1);
+    expect(outbox.map((email) => [email.to, email.subject])).toEqual([
+      ['ana@test.com', 'Tu cuenta de Gym App fue eliminada'],
+    ]);
+
+    // El token ya no sirve, no se puede entrar y el email/usuario quedan libres
+    expect((await request(app).get('/auth/me').set(auth)).status).toBe(401);
+    const login = await request(app).post('/auth/login').send({ identifier: 'ana', password: 'secreta123' });
+    expect(login.status).toBe(401);
+    await createUser('ana@test.com');
+  });
+
+  it('con la contraseña incorrecta responde 400 y no borra nada', async () => {
+    const { auth, user } = await createUser();
+    expect((await deleteAccount(auth, 'equivocada')).status).toBe(400);
+    expect(await prisma.user.findUnique({ where: { id: user.id } })).not.toBeNull();
+  });
+
+  it('exige login', async () => {
+    const response = await request(app).post('/auth/delete-account').send({ password: 'secreta123' });
+    expect(response.status).toBe(401);
   });
 });

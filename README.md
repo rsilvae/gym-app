@@ -8,6 +8,7 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 
 - 🔐 Registro con nombre de usuario y verificación del email por código; inicio de sesión con email o usuario (JWT), con sesión guardada de forma segura en el celular
 - 🔑 "Olvidé mi contraseña" con código por email, cambiar contraseña desde el perfil y "cerrar sesión en todos los dispositivos" (revoca los JWT anteriores)
+- 🗑️ Eliminar la cuenta desde la app (borra rutinas e historial; requisito de Apple)
 - 🛡️ Límite de intentos, headers de seguridad y respuestas que no revelan qué emails están registrados
 - 📋 Crear, editar, reordenar y eliminar rutinas
 - ✅ Entrenamiento en curso: cronómetro, progreso y check por serie con peso y reps editables

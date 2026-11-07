@@ -41,6 +41,10 @@ export const emailOnlySchema = z.object({ email });
 
 export const resetPasswordSchema = z.object({ email, code, password: newPassword });
 
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, 'Escribe tu contraseña').max(72),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Escribe tu contraseña actual').max(72),
   newPassword,

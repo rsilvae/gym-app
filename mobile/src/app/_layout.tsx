@@ -74,6 +74,7 @@ function RootNavigator() {
         <Stack.Screen name="exercises" options={{ title: 'Progreso', headerBackTitle: 'Historial' }} />
         <Stack.Screen name="progress/[name]" options={{ title: 'Progreso', headerBackTitle: 'Atrás' }} />
         <Stack.Screen name="change-password" options={{ title: 'Cambiar contraseña', headerBackTitle: 'Perfil' }} />
+        <Stack.Screen name="delete-account" options={{ title: 'Eliminar cuenta', headerBackTitle: 'Perfil' }} />
       </Stack.Protected>
 
       {/* Al iniciar sesión → la lista de rutinas */}
