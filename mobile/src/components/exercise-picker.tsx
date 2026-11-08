@@ -24,6 +24,7 @@ import { useExercisesQuery } from '@/hooks/use-workouts';
 import { ApiError } from '@/lib/api-client';
 import type { CatalogExercise, Equipment, MuscleGroup } from '@/types';
 import { matchesSearch, normalizeText } from '@/utils/search';
+import { findSimilarExercises } from '@/utils/similar';
 
 const MAX_RECENT = 8;
 
@@ -32,9 +33,20 @@ type Props = {
   onClose: () => void;
   /** Los ejercicios elegidos, en el orden en que se marcaron. */
   onAdd: (exercises: CatalogExercise[]) => void;
-  /** Ids que ya están en la rutina (se marcan con "Ya en la rutina"). */
+  /** Ids que ya están en la rutina (se marcan con `addedLabel`). */
   alreadyAdded: Set<string>;
+  /** Texto para los que ya están. Por defecto "Ya en la rutina". */
+  addedLabel?: string;
+  /**
+   * Modo reemplazar: se elige UN ejercicio (tocarlo basta) y aparece el filtro
+   * "Similares" con los parecidos a este, ya seleccionado.
+   */
+  replacing?: CatalogExercise | null;
 };
+
+/** El filtro de músculo, más "Similares" (solo al reemplazar). */
+type MuscleFilter = MuscleGroup | 'SIMILAR';
+const MUSCLE_FILTER_LABELS: Record<MuscleFilter, string> = { ...MUSCLE_LABELS, SIMILAR: '≈ Similares' };
 
 /** "Pecho · Barra" */
 export function exerciseSubtitle(exercise: Pick<CatalogExercise, 'primaryMuscle' | 'equipment'>) {
@@ -46,20 +58,35 @@ export function exerciseSubtitle(exercise: Pick<CatalogExercise, 'primaryMuscle'
  * buscador, filtros por músculo y equipo, recientes, selección múltiple y
  * "Crear ejercicio" si no está.
  */
-export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props) {
+export function ExercisePicker({
+  visible,
+  onClose,
+  onAdd,
+  alreadyAdded,
+  addedLabel = 'Ya en la rutina',
+  replacing = null,
+}: Props) {
   const theme = useTheme();
   const catalog = useCatalogQuery();
   const history = useExercisesQuery();
+  const initialMuscle: MuscleFilter | null = replacing ? 'SIMILAR' : null;
 
   const [query, setQuery] = useState('');
-  const [muscle, setMuscle] = useState<MuscleGroup | null>(null);
+  // (Quien lo usa le pone un `key` distinto al reemplazar otro ejercicio, así este estado arranca de nuevo)
+  const [muscle, setMuscle] = useState<MuscleFilter | null>(initialMuscle);
   const [equipment, setEquipment] = useState<Equipment | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isCreating, setIsCreating] = useState(false);
 
+  /** Al reemplazar se elige uno solo: tocarlo ya lo elige. */
+  function pickOne(exercise: CatalogExercise) {
+    onAdd([exercise]);
+    close();
+  }
+
   function reset() {
     setQuery('');
-    setMuscle(null);
+    setMuscle(initialMuscle);
     setEquipment(null);
     setSelectedIds([]);
     setIsCreating(false);
@@ -91,14 +118,23 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
     [catalog.data],
   );
 
+  // Los parecidos al que se reemplaza, ordenados del más parecido al menos
+  const similar = useMemo(() => {
+    if (!replacing) return [];
+    const ids = findSimilarExercises(replacing, catalog.data ?? []).map((exercise) => exercise.id);
+    const byId = new Map(searchable.map((item) => [item.exercise.id, item]));
+    return ids.flatMap((id) => byId.get(id) ?? []);
+  }, [replacing, catalog.data, searchable]);
+
   const filtered = useMemo(
     () =>
-      searchable
-        .filter(({ exercise }) => !muscle || exercise.primaryMuscle === muscle)
+      (muscle === 'SIMILAR' ? similar : searchable)
+        .filter(({ exercise }) => !muscle || muscle === 'SIMILAR' || exercise.primaryMuscle === muscle)
         .filter(({ exercise }) => !equipment || exercise.equipment === equipment)
+        .filter(({ exercise }) => exercise.id !== replacing?.id)
         .filter(({ haystack }) => matchesSearch(haystack, query))
         .map(({ exercise }) => exercise),
-    [searchable, muscle, equipment, query],
+    [searchable, similar, muscle, equipment, query, replacing],
   );
 
   // Recientes: los que hiciste en tus entrenamientos (el historial guarda el nombre)
@@ -111,10 +147,13 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
       .slice(0, MAX_RECENT);
   }, [catalog.data, history.data, filtered]);
 
-  const sections = [
-    ...(recent.length > 0 && !query ? [{ title: 'Recientes', data: recent }] : []),
-    { title: query || muscle || equipment ? `Resultados (${filtered.length})` : 'Todos', data: filtered },
-  ];
+  const sections =
+    muscle === 'SIMILAR' && replacing
+      ? [{ title: `Parecidos a «${replacing.name}» (${filtered.length})`, data: filtered }]
+      : [
+          ...(recent.length > 0 && !query ? [{ title: 'Recientes', data: recent }] : []),
+          { title: query || muscle || equipment ? `Resultados (${filtered.length})` : 'Todos', data: filtered },
+        ];
 
   const exactMatch = filtered.some((exercise) => normalizeText(exercise.name) === normalizeText(query));
   const selectedExercises = selectedIds
@@ -126,18 +165,21 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
     const inRoutine = alreadyAdded.has(exercise.id);
     return (
       <Pressable
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: selected }}
-        onPress={() => toggle(exercise.id)}
+        accessibilityRole={replacing ? 'button' : 'checkbox'}
+        accessibilityState={replacing ? undefined : { checked: selected }}
+        onPress={() => (replacing ? pickOne(exercise) : toggle(exercise.id))}
         style={[styles.row, { borderBottomColor: theme.backgroundSelected }]}>
         <View style={styles.rowText}>
           <ThemedText>{exercise.name}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary">
             {exerciseSubtitle(exercise)}
             {exercise.isCustom ? ' · Tuyo' : ''}
-            {inRoutine ? ' · Ya en la rutina' : ''}
+            {inRoutine ? ` · ${addedLabel}` : ''}
           </ThemedText>
         </View>
+        {replacing ? (
+          <ThemedText themeColor="textSecondary">›</ThemedText>
+        ) : (
         <View
           style={[
             styles.check,
@@ -147,6 +189,7 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
           ]}>
           {selected && <ThemedText style={styles.checkMark}>✓</ThemedText>}
         </View>
+        )}
       </Pressable>
     );
   }
@@ -159,14 +202,22 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
             <Pressable accessibilityRole="button" onPress={isCreating ? () => setIsCreating(false) : close} hitSlop={8}>
               <ThemedText themeColor="primary">{isCreating ? '‹ Volver' : 'Cancelar'}</ThemedText>
             </Pressable>
-            <ThemedText type="smallBold">{isCreating ? 'Nuevo ejercicio' : 'Añadir ejercicios'}</ThemedText>
+            <ThemedText type="smallBold">
+              {isCreating ? 'Nuevo ejercicio' : replacing ? 'Reemplazar ejercicio' : 'Añadir ejercicios'}
+            </ThemedText>
             <View style={styles.headerSpacer} />
           </View>
+          {replacing && !isCreating && (
+            <ThemedText type="small" themeColor="textSecondary" style={styles.replacingNote}>
+              Elige el ejercicio que harás en vez de «{replacing.name}».
+            </ThemedText>
+          )}
 
           {isCreating ? (
             <CreateExerciseForm
               initialName={query}
               onCreated={(exercise) => {
+                if (replacing) return pickOne(exercise);
                 setSelectedIds((current) => (current.includes(exercise.id) ? current : [...current, exercise.id]));
                 setQuery('');
                 setIsCreating(false);
@@ -185,9 +236,9 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
                   returnKeyType="search"
                   style={[styles.search, { color: theme.text, backgroundColor: theme.backgroundElement }]}
                 />
-                <ChipRow
-                  options={MUSCLES.filter((m) => m !== 'OTHER')}
-                  labels={MUSCLE_LABELS}
+                <ChipRow<MuscleFilter>
+                  options={[...(replacing ? (['SIMILAR'] as const) : []), ...MUSCLES.filter((m) => m !== 'OTHER')]}
+                  labels={MUSCLE_FILTER_LABELS}
                   value={muscle}
                   onChange={setMuscle}
                 />
@@ -234,7 +285,7 @@ export function ExercisePicker({ visible, onClose, onAdd, alreadyAdded }: Props)
                 />
               )}
 
-              {selectedExercises.length > 0 && (
+              {!replacing && selectedExercises.length > 0 && (
                 <View style={styles.footer}>
                   <Button
                     title={`Añadir ${selectedExercises.length} ${selectedExercises.length === 1 ? 'ejercicio' : 'ejercicios'}`}
@@ -367,6 +418,10 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 60,
+  },
+  replacingNote: {
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.two,
   },
   filters: {
     paddingHorizontal: Spacing.three,

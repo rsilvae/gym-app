@@ -9,19 +9,47 @@ import { createId } from '@/utils/id';
  * separada de la pantalla, y es fácil de probar.
  */
 
-/** Una serie mientras entrenas. Peso y reps son texto para poder editarlos libremente. */
+/**
+ * Una serie mientras entrenas. Peso y reps son texto para poder editarlos libremente.
+ * Empiezan vacíos: la pantalla muestra de sugerencia (placeholder) lo que hiciste la última vez,
+ * o el objetivo de la rutina, y al marcar la serie se usa esa sugerencia si no escribiste nada.
+ */
 export type ActiveSet = {
   id: string;
   weight: string;
   reps: string;
   completed: boolean;
+  /** Objetivo de la rutina: la sugerencia cuando nunca hiciste el ejercicio. */
+  targetWeight?: string;
+  targetReps?: string;
 };
 
 export type ActiveExercise = {
   id: string;
+  /** El ejercicio del catálogo (para "Similares" al reemplazar). Puede faltar en borradores viejos. */
+  catalogId?: string | null;
   name: string;
   sets: ActiveSet[];
 };
+
+/** Lo que se muestra de sugerencia en una serie (y se usa al marcarla vacía). */
+export type SetSuggestion = { weight: string; reps: string };
+
+/** Un ejercicio elegido del catálogo para agregar o reemplazar. */
+type PickedExercise = { catalogId: string; name: string };
+
+const NEW_EXERCISE_SETS = 3;
+
+function emptySets(count: number, from?: ActiveSet[]): ActiveSet[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: createId(),
+    weight: '',
+    reps: '',
+    completed: false,
+    targetWeight: from?.[index]?.targetWeight,
+    targetReps: from?.[index]?.targetReps,
+  }));
+}
 
 export type WorkoutState = {
   routineId: string;
@@ -32,9 +60,16 @@ export type WorkoutState = {
 
 export type WorkoutAction =
   | { type: 'UPDATE_SET'; exerciseId: string; setId: string; field: 'weight' | 'reps'; value: string }
-  | { type: 'TOGGLE_SET'; exerciseId: string; setId: string }
+  /** `fill`: la sugerencia, para completar peso o reps vacíos al marcar la serie. */
+  | { type: 'TOGGLE_SET'; exerciseId: string; setId: string; fill?: SetSuggestion }
+  /** Copia peso y reps (ej: tocar "lo de la última vez"). */
+  | { type: 'FILL_SET'; exerciseId: string; setId: string; values: SetSuggestion }
   | { type: 'ADD_SET'; exerciseId: string }
-  | { type: 'REMOVE_SET'; exerciseId: string; setId: string };
+  | { type: 'REMOVE_SET'; exerciseId: string; setId: string }
+  | { type: 'ADD_EXERCISES'; exercises: PickedExercise[] }
+  | { type: 'REMOVE_EXERCISE'; exerciseId: string }
+  /** Cambia el ejercicio por otro: mantiene la cantidad de series, pero vacías. */
+  | { type: 'REPLACE_EXERCISE'; exerciseId: string; exercise: PickedExercise };
 
 /** Crea el estado inicial a partir de una rutina: una serie por cada serie objetivo. */
 export function createWorkoutState(routine: Routine): WorkoutState {
@@ -44,12 +79,15 @@ export function createWorkoutState(routine: Routine): WorkoutState {
     startedAt: Date.now(),
     exercises: routine.exercises.map((exercise) => ({
       id: exercise.id,
+      catalogId: exercise.exerciseId ?? null,
       name: exercise.name,
       sets: Array.from({ length: exercise.targetSets }, () => ({
         id: createId(),
-        weight: exercise.targetWeight > 0 ? String(exercise.targetWeight) : '',
-        reps: String(exercise.targetReps),
+        weight: '',
+        reps: '',
         completed: false,
+        targetWeight: exercise.targetWeight > 0 ? String(exercise.targetWeight) : '',
+        targetReps: String(exercise.targetReps),
       })),
     })),
   };
@@ -82,8 +120,24 @@ export function workoutReducer(state: WorkoutState, action: WorkoutAction): Work
     case 'TOGGLE_SET':
       return updateExercise(state, action.exerciseId, (exercise) => ({
         ...exercise,
+        sets: exercise.sets.map((set) => {
+          if (set.id !== action.setId) return set;
+          if (set.completed) return { ...set, completed: false };
+          // Al marcarla, lo que dejaste vacío toma el valor sugerido
+          return {
+            ...set,
+            completed: true,
+            weight: set.weight.trim() === '' ? (action.fill?.weight ?? '') : set.weight,
+            reps: set.reps.trim() === '' ? (action.fill?.reps ?? '') : set.reps,
+          };
+        }),
+      }));
+
+    case 'FILL_SET':
+      return updateExercise(state, action.exerciseId, (exercise) => ({
+        ...exercise,
         sets: exercise.sets.map((set) =>
-          set.id === action.setId ? { ...set, completed: !set.completed } : set,
+          set.id === action.setId ? { ...set, weight: action.values.weight, reps: action.values.reps } : set,
         ),
       }));
 
@@ -96,6 +150,8 @@ export function workoutReducer(state: WorkoutState, action: WorkoutAction): Work
           weight: last?.weight ?? '',
           reps: last?.reps ?? '',
           completed: false,
+          targetWeight: last?.targetWeight,
+          targetReps: last?.targetReps,
         };
         return { ...exercise, sets: [...exercise.sets, newSet] };
       });
@@ -105,7 +161,51 @@ export function workoutReducer(state: WorkoutState, action: WorkoutAction): Work
         ...exercise,
         sets: exercise.sets.filter((set) => set.id !== action.setId),
       }));
+
+    case 'ADD_EXERCISES':
+      return {
+        ...state,
+        exercises: [
+          ...state.exercises,
+          ...action.exercises.map((picked) => ({
+            id: createId(),
+            catalogId: picked.catalogId,
+            name: picked.name,
+            sets: emptySets(NEW_EXERCISE_SETS),
+          })),
+        ],
+      };
+
+    case 'REMOVE_EXERCISE':
+      return { ...state, exercises: state.exercises.filter((exercise) => exercise.id !== action.exerciseId) };
+
+    case 'REPLACE_EXERCISE':
+      return updateExercise(state, action.exerciseId, (exercise) => ({
+        ...exercise,
+        catalogId: action.exercise.catalogId,
+        name: action.exercise.name,
+        // El objetivo de reps de la rutina sigue sirviendo; el peso no (es otro ejercicio)
+        sets: emptySets(Math.max(exercise.sets.length, 1), exercise.sets).map((set) => ({
+          ...set,
+          targetWeight: '',
+        })),
+      }));
   }
+}
+
+/**
+ * La sugerencia para la serie número `index` (desde 0):
+ *   1. Lo que hiciste en esa serie la última vez (si hiciste menos series, la última que hiciste).
+ *   2. Si nunca hiciste el ejercicio, el objetivo de la rutina.
+ */
+export function suggestionFor(
+  set: ActiveSet,
+  index: number,
+  lastSets: { weight: number; reps: number }[] | undefined,
+): SetSuggestion {
+  const previous = lastSets?.[index] ?? lastSets?.at(-1);
+  if (previous) return { weight: String(previous.weight), reps: String(previous.reps) };
+  return { weight: set.targetWeight ?? '', reps: set.targetReps ?? '' };
 }
 
 /** Convierte texto a número (acepta "62,5"). Si no es un número válido ≥ 0, devuelve 0. */

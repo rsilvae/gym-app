@@ -1,9 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { ExercisePicker } from '@/components/exercise-picker';
 import { ErrorView, LoadingView } from '@/components/query-status';
 import { RestDurationField } from '@/components/rest-duration-field';
 import { RestTimerBar } from '@/components/rest-timer-bar';
@@ -14,18 +15,23 @@ import { Spacing } from '@/constants/theme';
 import {
   createWorkoutState,
   getProgress,
+  suggestionFor,
   toWorkoutInput,
   workoutReducer,
   type ActiveExercise,
+  type SetSuggestion,
   type WorkoutState,
 } from '@/features/workout/workout-reducer';
+import { useCatalogById, useCatalogQuery } from '@/hooks/use-catalog';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
 import { useRestTimer, type RunningRest } from '@/hooks/use-rest-timer';
 import { useRoutineQuery } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkoutDraft } from '@/hooks/use-workout-draft';
 import { useLastPerformanceQuery, useSaveWorkout } from '@/hooks/use-workouts';
-import { formatRelativeDay, formatSets } from '@/utils/format';
+import type { CatalogExercise } from '@/types';
+import { formatRelativeDay, formatSet } from '@/utils/format';
+import { normalizeText } from '@/utils/search';
 
 const DEFAULT_REST_SECONDS = 90;
 
@@ -97,6 +103,12 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
   }, [state, restSeconds, runningRest]);
 
   const saveWorkout = useSaveWorkout();
+  const catalog = useCatalogQuery();
+  const catalogById = useCatalogById();
+  /** El selector de ejercicios: para agregar, o para reemplazar uno. */
+  const [picker, setPicker] = useState<{ kind: 'add' } | { kind: 'replace'; exerciseId: string } | null>(null);
+  const replacingExercise =
+    picker?.kind === 'replace' ? state.exercises.find((exercise) => exercise.id === picker.exerciseId) : undefined;
   // "La última vez" de cada ejercicio de la rutina (si ya los hiciste antes)
   const { data: lastPerformance } = useLastPerformanceQuery(state.exercises.map((exercise) => exercise.name));
 
@@ -152,9 +164,72 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
     ]);
   }
 
+  /** El ejercicio del catálogo que corresponde (por id, o por nombre en borradores viejos). */
+  function catalogExerciseFor(exercise: ActiveExercise): CatalogExercise {
+    const found =
+      (exercise.catalogId ? catalogById.get(exercise.catalogId) : undefined) ??
+      catalog.data?.find((item) => normalizeText(item.name) === normalizeText(exercise.name));
+    // Si no está en el catálogo, uno "provisorio" para que Similares busque por el nombre
+    return (
+      found ?? {
+        id: `name:${exercise.name}`,
+        name: exercise.name,
+        primaryMuscle: 'OTHER',
+        secondaryMuscles: [],
+        equipment: 'OTHER',
+        isCustom: true,
+      }
+    );
+  }
+
+  function handlePicked(picked: CatalogExercise[]) {
+    if (!picker) return;
+    if (picker.kind === 'add') {
+      dispatch({
+        type: 'ADD_EXERCISES',
+        exercises: picked.map((exercise) => ({ catalogId: exercise.id, name: exercise.name })),
+      });
+    } else if (picked[0]) {
+      dispatch({
+        type: 'REPLACE_EXERCISE',
+        exerciseId: picker.exerciseId,
+        exercise: { catalogId: picked[0].id, name: picked[0].name },
+      });
+    }
+  }
+
+  function confirmRemoveExercise(exercise: ActiveExercise) {
+    Alert.alert('Eliminar ejercicio', `¿Quitar ${exercise.name} de este entrenamiento?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      {
+        text: 'Eliminar',
+        style: 'destructive',
+        onPress: () => dispatch({ type: 'REMOVE_EXERCISE', exerciseId: exercise.id }),
+      },
+    ]);
+  }
+
+  function startReplace(exercise: ActiveExercise) {
+    const open = () => setPicker({ kind: 'replace', exerciseId: exercise.id });
+    if (!exercise.sets.some((set) => set.completed)) return open();
+    Alert.alert('Reemplazar ejercicio', 'Ya marcaste series de este ejercicio. Al reemplazarlo se borran.', [
+      { text: 'Cancelar', style: 'cancel' },
+      { text: 'Reemplazar', style: 'destructive', onPress: open },
+    ]);
+  }
+
+  /** Menú "•••" de cada ejercicio. */
+  function openExerciseMenu(exercise: ActiveExercise) {
+    Alert.alert(exercise.name, undefined, [
+      { text: 'Reemplazar ejercicio', onPress: () => startReplace(exercise) },
+      { text: 'Eliminar ejercicio', style: 'destructive', onPress: () => confirmRemoveExercise(exercise) },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  }
+
   /** Marca o desmarca una serie. Al marcarla como hecha, empieza el descanso. */
-  function toggleSet(exercise: ActiveExercise, setId: string, wasCompleted: boolean) {
-    dispatch({ type: 'TOGGLE_SET', exerciseId: exercise.id, setId });
+  function toggleSet(exercise: ActiveExercise, setId: string, wasCompleted: boolean, fill: SetSuggestion) {
+    dispatch({ type: 'TOGGLE_SET', exerciseId: exercise.id, setId, fill });
     if (!wasCompleted) {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       restTimer.start();
@@ -240,32 +315,62 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
           const last = lastPerformance?.[exercise.name];
           return (
             <ThemedView key={exercise.id} type="backgroundElement" style={styles.card}>
-              <ThemedText type="smallBold" themeColor={done ? 'primary' : 'text'} style={styles.exerciseName}>
-                {done ? '✓ ' : ''}
-                {exercise.name}
-              </ThemedText>
+              <View style={styles.exerciseHeader}>
+                <ThemedText
+                  type="smallBold"
+                  themeColor={done ? 'primary' : 'text'}
+                  style={[styles.exerciseName, styles.flex]}>
+                  {done ? '✓ ' : ''}
+                  {exercise.name}
+                </ThemedText>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Opciones de ${exercise.name}`}
+                  hitSlop={12}
+                  onPress={() => openExerciseMenu(exercise)}
+                  style={styles.menuButton}>
+                  <ThemedText type="smallBold" themeColor="primary">
+                    •••
+                  </ThemedText>
+                </Pressable>
+              </View>
               {last && (
                 <ThemedText type="small" themeColor="textSecondary">
-                  Última vez ({formatRelativeDay(last.finishedAt)}): {formatSets(last.sets)}
+                  Última vez: {formatRelativeDay(last.finishedAt)}
                 </ThemedText>
               )}
 
               <SetRowHeader />
-              {exercise.sets.map((set, index) => (
-                <SetRow
-                  key={set.id}
-                  number={index + 1}
-                  set={set}
-                  onChangeWeight={(value) =>
-                    dispatch({ type: 'UPDATE_SET', exerciseId: exercise.id, setId: set.id, field: 'weight', value })
-                  }
-                  onChangeReps={(value) =>
-                    dispatch({ type: 'UPDATE_SET', exerciseId: exercise.id, setId: set.id, field: 'reps', value })
-                  }
-                  onToggle={() => toggleSet(exercise, set.id, set.completed)}
-                  onLongPressNumber={() => confirmRemoveSet(exercise, set.id, index + 1)}
-                />
-              ))}
+              {exercise.sets.map((set, index) => {
+                const previousSet = last?.sets[index];
+                const suggestion = suggestionFor(set, index, last?.sets);
+                return (
+                  <SetRow
+                    key={set.id}
+                    number={index + 1}
+                    set={set}
+                    previous={previousSet ? formatSet(previousSet) : null}
+                    suggestion={suggestion}
+                    onChangeWeight={(value) =>
+                      dispatch({ type: 'UPDATE_SET', exerciseId: exercise.id, setId: set.id, field: 'weight', value })
+                    }
+                    onChangeReps={(value) =>
+                      dispatch({ type: 'UPDATE_SET', exerciseId: exercise.id, setId: set.id, field: 'reps', value })
+                    }
+                    onToggle={() => toggleSet(exercise, set.id, set.completed, suggestion)}
+                    onPressPrevious={() =>
+                      previousSet &&
+                      dispatch({
+                        type: 'FILL_SET',
+                        exerciseId: exercise.id,
+                        setId: set.id,
+                        values: { weight: String(previousSet.weight), reps: String(previousSet.reps) },
+                      })
+                    }
+                    onLongPressNumber={() => confirmRemoveSet(exercise, set.id, index + 1)}
+                  />
+                );
+              })}
 
               <Button
                 title="+ Agregar serie"
@@ -277,8 +382,18 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
           );
         })}
 
+        {state.exercises.length === 0 && (
+          <ThemedText themeColor="textSecondary" style={styles.hint}>
+            No hay ejercicios. Agrega alguno para empezar.
+          </ThemedText>
+        )}
+
+        <Button title="+ Agregar ejercicios" variant="secondary" onPress={() => setPicker({ kind: 'add' })} />
+
         <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
-          Mantén presionado el número de una serie para quitarla.
+          Los números en gris son lo que hiciste la última vez: si no escribes nada, se usan al marcar la serie.
+          Toca «Anterior» para copiarlo, mantén presionado el número de una serie para quitarla y usa ••• para
+          reemplazar o eliminar un ejercicio.
         </ThemedText>
 
         <Button
@@ -289,6 +404,17 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
       </ScrollView>
 
       <RestTimerBar timer={restTimer} />
+
+      <ExercisePicker
+        // Un key distinto por ejercicio: así el selector arranca limpio (y con "Similares") cada vez
+        key={picker?.kind === 'replace' ? `replace-${picker.exerciseId}` : 'add'}
+        visible={picker !== null}
+        onClose={() => setPicker(null)}
+        onAdd={handlePicked}
+        alreadyAdded={new Set(state.exercises.flatMap((exercise) => exercise.catalogId ?? []))}
+        addedLabel="Ya en el entrenamiento"
+        replacing={replacingExercise ? catalogExerciseFor(replacingExercise) : null}
+      />
     </ThemedView>
   );
 }
@@ -338,6 +464,17 @@ const styles = StyleSheet.create({
   exerciseName: {
     fontSize: 18,
     lineHeight: 24,
+  },
+  exerciseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  flex: {
+    flex: 1,
+  },
+  menuButton: {
+    paddingHorizontal: Spacing.one,
   },
   hint: {
     textAlign: 'center',
