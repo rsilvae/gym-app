@@ -375,3 +375,39 @@ export const EXERCISE_CATALOG: CatalogExercise[] = [
   ex('hiking', 'Senderismo', 'CARDIO', 'BODYWEIGHT'),
   ex('boxing', 'Boxeo', 'CARDIO', 'OTHER', ['SHOULDERS']),
 ];
+
+/**
+ * Otros nombres para ejercicios del catálogo: nombre → id.
+ * Sirven al importar el historial de otras apps (y para rutinas escritas a mano):
+ * "Extensión de Pierna" es el mismo ejercicio que "Extensión de piernas (Máquina)".
+ * Las mayúsculas y tildes no importan. Un alias nunca puede ser igual a un nombre del catálogo.
+ */
+export const EXERCISE_ALIASES: Record<string, string> = {
+  // Nombres de Hevy en español
+  'Extensión de Pierna': 'leg-extension',
+  'Curl de Pierna Sentado': 'seated-leg-curl',
+  'Empuje de Caderas (Barra)': 'hip-thrust-barbell',
+  'Abdominal Corto con Cable': 'cable-crunch',
+  'Curl por detrás de la espalda (Polea)': 'behind-back-curl-cable',
+  'Curl de Bíceps Detrás de Espalda (Barra)': 'behind-back-curl-barbell',
+  'Abducción de Caderas': 'hip-abduction-machine',
+  'Aducción de Caderas': 'hip-adduction-machine',
+  'Elevación de Gemelos Sentado': 'seated-calf-raise',
+  'Press de Pantorrilla (Máquina)': 'calf-press',
+  'Elevacion Laterales (Mancuerna)': 'lateral-raise-dumbbell',
+  'Elevaciones laterales (Mancuernas)': 'lateral-raise-dumbbell',
+  'Giro con cable (de arriba hacia abajo)': 'cable-woodchop',
+  'Oblicuos Elevación Lateral Mancuerna': 'dumbbell-side-bend',
+  'Curl de Extensión de Muñeca (Barra)': 'wrist-extension-barbell',
+  'Extensión de Muñeca Sentado (Barra)': 'wrist-extension-barbell',
+  'Curl de Muñeca Palmas arriba': 'wrist-curl-dumbbell',
+  'Press de Piernas': 'leg-press',
+  'Press de Piernas Sentado': 'seated-leg-press',
+  'Máquina para Fondos Sentado': 'seated-dip-machine',
+  'Remo en Base Rotativa': 't-bar-row',
+  'Sentadilla Goblet': 'goblet-squat',
+  'Cables Cruzados': 'cable-crossover',
+  'Curl con Barra EZ': 'biceps-curl-ez',
+  'Sentadilla Lateral': 'lateral-lunge',
+  'Press de hombro sentado (Máquina)': 'shoulder-press-machine',
+};

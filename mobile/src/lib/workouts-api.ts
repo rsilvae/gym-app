@@ -1,6 +1,7 @@
 import { apiFetch } from '@/lib/api-client';
 import type {
   ExerciseSummary,
+  ImportResult,
   LastPerformance,
   ProgressPoint,
   WorkoutDetail,
@@ -18,6 +19,10 @@ export const workoutsApi = {
     apiFetch<{ id: string }>('/workouts', { method: 'POST', body: JSON.stringify(input) }),
 
   remove: (id: string) => apiFetch<void>(`/workouts/${id}`, { method: 'DELETE' }),
+
+  /** Importa el CSV de otra app. dryRun = true solo devuelve la vista previa. */
+  importCsv: (input: { csv: string; timeZone: string; dryRun: boolean }) =>
+    apiFetch<ImportResult>('/workouts/import', { method: 'POST', body: JSON.stringify(input) }),
 
   /** ?names=A&names=B — encodeURIComponent convierte espacios y acentos para la URL. */
   lastPerformance: (names: string[]) => {

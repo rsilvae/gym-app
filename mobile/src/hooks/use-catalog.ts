@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { catalogApi } from '@/lib/catalog-api';
 import type { CatalogExercise, NewExerciseInput } from '@/types';
 
-const catalogKey = ['catalog', 'exercises'] as const;
+export const catalogKey = ['catalog', 'exercises'] as const;
 
 /**
  * El catálogo de ejercicios. Casi nunca cambia, así que se pide una vez y

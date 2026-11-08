@@ -29,7 +29,12 @@ export function createApp({ rateLimits = true }: AppOptions = {}) {
   // Headers de seguridad estándar (y quita "X-Powered-By: Express", que da pistas a atacantes)
   app.use(helmet());
 
+  // Importar un historial manda el CSV completo: esa ruta acepta hasta 6 MB, y
+  // requireAuth va antes para no leer un body grande de alguien sin sesión.
+  app.use('/workouts/import', requireAuth, express.json({ limit: '6mb' }));
+
   // Convierte el body JSON de las peticiones en un objeto (req.body). Máximo 100 KB.
+  // (Si ya se leyó arriba, no lo vuelve a leer.)
   app.use(express.json({ limit: '100kb' }));
 
   // Para comprobar que el servidor está vivo

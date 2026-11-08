@@ -17,6 +17,7 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 - ⏱️ Temporizador de descanso automático al marcar una serie (ajustable, vibra al terminar)
 - 🕑 "Última vez": muestra lo que hiciste en cada ejercicio la sesión anterior
 - 📈 Historial con duración, series y volumen total de cada entrenamiento
+- 📥 Importar el historial de otra app (CSV de Hevy) con vista previa: vincula los ejercicios al catálogo, omite calentamientos y no duplica si importas dos veces
 - 📊 Gráfico de progreso por ejercicio: peso máximo, 1RM estimado (Epley), volumen y reps
 
 ## Stack

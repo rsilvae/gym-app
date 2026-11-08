@@ -68,6 +68,11 @@ export default function ProfileScreen() {
           <ThemedText type="smallBold">{memberSince}</ThemedText>
         </ThemedView>
 
+        <Button
+          title="Importar entrenamientos de otra app"
+          variant="secondary"
+          onPress={() => router.push('/import-workouts')}
+        />
         <Button title="Cambiar contraseña" variant="secondary" onPress={() => router.push('/change-password')} />
         <Button
           title="Cerrar sesión en todos los dispositivos"

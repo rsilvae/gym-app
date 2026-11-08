@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { catalogKey } from '@/hooks/use-catalog';
 import { workoutsApi } from '@/lib/workouts-api';
 import type { WorkoutInput } from '@/types';
 
@@ -56,6 +57,19 @@ export function useSaveWorkout() {
   return useMutation({
     mutationFn: (input: WorkoutInput) => workoutsApi.create(input),
     onSuccess: () => invalidateWorkoutData(queryClient),
+  });
+}
+
+/** Importar agrega entrenamientos al historial y puede crear ejercicios personalizados. */
+export function useImportWorkouts() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: workoutsApi.importCsv,
+    onSuccess: (result) => {
+      if (!result.imported) return; // la vista previa no cambia nada
+      invalidateWorkoutData(queryClient);
+      queryClient.invalidateQueries({ queryKey: catalogKey });
+    },
   });
 }
 

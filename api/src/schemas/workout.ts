@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { isValidTimeZone } from '../utils/time-zone.ts';
+
 /** Una serie hecha: peso en kg y repeticiones. */
 const setSchema = z.object({
   weight: z.number().min(0).max(2000),
@@ -29,6 +31,15 @@ export const workoutInputSchema = z
   });
 
 export type WorkoutInput = z.infer<typeof workoutInputSchema>;
+
+/** Body de POST /workouts/import: el CSV como texto y la zona horaria del celular. */
+export const workoutImportSchema = z.object({
+  csv: z.string().min(1, 'El archivo está vacío').max(5_000_000, 'El archivo es demasiado grande (máx. 5 MB)'),
+  /** Zona horaria IANA del celular (ej: "America/Santiago"): las fechas del CSV no la traen. */
+  timeZone: z.string().refine(isValidTimeZone, 'Zona horaria no válida'),
+  /** true = solo muestra qué se importaría, sin guardar nada. */
+  dryRun: z.boolean().default(true),
+});
 
 /** Query de GET /exercises/last: uno o varios nombres (?names=A&names=B). */
 export const lastPerformanceQuerySchema = z.object({

@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { EXERCISE_CATALOG } from '../src/catalog/exercise-catalog.ts';
+import { EXERCISE_ALIASES, EXERCISE_CATALOG } from '../src/catalog/exercise-catalog.ts';
 import { linkLegacyRoutineExercises, syncExerciseCatalog } from '../src/catalog/sync-catalog.ts';
 import { normalizeName } from '../src/utils/normalize.ts';
 import { app, createUser, prisma, request, resetDatabase } from './helpers.ts';
@@ -122,6 +122,15 @@ describe('Rutinas con ejercicios del catálogo', () => {
       .set(beto.auth)
       .send(routine([{ exerciseId: anaExercise.body.id, name: 'Secreto', targetSets: 3, targetReps: 10 }]));
     expect(response.status).toBe(400);
+  });
+
+  it('cada alias apunta a un ejercicio que existe y no repite un nombre del catálogo', () => {
+    const ids = new Set(EXERCISE_CATALOG.map((exercise) => exercise.id));
+    const names = new Set(EXERCISE_CATALOG.map((exercise) => normalizeName(exercise.name)));
+    for (const [alias, id] of Object.entries(EXERCISE_ALIASES)) {
+      expect(ids.has(id), `${alias} → ${id}`).toBe(true);
+      expect(names.has(normalizeName(alias)), alias).toBe(false);
+    }
   });
 
   it('sin exerciseId (app vieja) lo vincula por nombre o crea uno personalizado', async () => {

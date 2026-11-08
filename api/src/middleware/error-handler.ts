@@ -23,6 +23,12 @@ export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
 
+  // Body más grande que el límite de express.json
+  if (err?.type === 'entity.too.large') {
+    res.status(413).json({ error: 'Los datos enviados son demasiado grandes' });
+    return;
+  }
+
   console.error(err);
   res.status(500).json({ error: 'Error interno del servidor' });
 };

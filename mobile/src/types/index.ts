@@ -106,6 +106,22 @@ export type WorkoutInput = {
   exercises: { name: string; sets: PerformedSet[] }[];
 };
 
+/** Lo que devuelve POST /workouts/import: la vista previa, o el resultado si se guardó. */
+export type ImportResult = {
+  workouts: number;
+  sets: number;
+  /** Entrenamientos que ya estaban en el historial (no se vuelven a importar). */
+  skippedDuplicates: number;
+  skippedWarmups: number;
+  skippedWithoutReps: number;
+  firstDate: string | null;
+  lastDate: string | null;
+  matchedExercises: number;
+  /** Ejercicios que no están en el catálogo: se crean como personalizados. */
+  newExercises: string[];
+  imported: boolean;
+};
+
 /** Un entrenamiento en la lista del historial. */
 export type WorkoutSummary = {
   id: string;

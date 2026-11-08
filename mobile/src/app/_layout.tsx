@@ -75,6 +75,10 @@ function RootNavigator() {
         <Stack.Screen name="progress/[name]" options={{ title: 'Progreso', headerBackTitle: 'Atrás' }} />
         <Stack.Screen name="change-password" options={{ title: 'Cambiar contraseña', headerBackTitle: 'Perfil' }} />
         <Stack.Screen name="delete-account" options={{ title: 'Eliminar cuenta', headerBackTitle: 'Perfil' }} />
+        <Stack.Screen
+          name="import-workouts"
+          options={{ title: 'Importar entrenamientos', headerBackTitle: 'Perfil' }}
+        />
       </Stack.Protected>
 
       {/* Al iniciar sesión → la lista de rutinas */}

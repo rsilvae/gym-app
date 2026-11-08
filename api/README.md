@@ -47,6 +47,7 @@ npm run dev               # http://localhost:3000
 | PUT | `/routines/:id` 🔒 | Reemplaza nombre y ejercicios |
 | DELETE | `/routines/:id` 🔒 | Elimina una rutina |
 | POST | `/workouts` 🔒 | Guarda un entrenamiento terminado |
+| POST | `/workouts/import` 🔒 | Importa un CSV de otra app (`csv`, `timeZone`, `dryRun`) → resumen; con `dryRun: true` no guarda nada |
 | GET | `/workouts` 🔒 | Historial (resumen: series, volumen, duración) |
 | GET | `/workouts/:id` 🔒 | Detalle con las series de cada ejercicio |
 | DELETE | `/workouts/:id` 🔒 | Elimina un entrenamiento |
@@ -60,6 +61,13 @@ npm run dev               # http://localhost:3000
 
 - La lista de la app está en [`src/catalog/exercise-catalog.ts`](src/catalog/exercise-catalog.ts) (~320 ejercicios, con id fijo). Al arrancar, la API la sincroniza con la base: agregar un ejercicio es editar ese archivo y desplegar.
 - Cada ejercicio de una rutina apunta al catálogo (`exerciseId`). Si llega solo el nombre (rutinas viejas o apps sin actualizar), se vincula por nombre sin importar mayúsculas ni tildes, o se crea un ejercicio personalizado.
+
+### Importar el historial de otra app
+
+- Lee el CSV que exporta Hevy (una fila por serie; peso en `weight_kg` o `weight_lbs`). El parser está en [`src/import/`](src/import/).
+- Las fechas del CSV no traen zona horaria ("4 nov 2026, 13:56"): la app manda la del celular y la API las convierte a UTC, respetando el horario de verano.
+- Cada ejercicio se busca en el catálogo, también por sus alias ("Extensión de Pierna" → "Extensión de piernas (Máquina)"), y se guarda con el nombre del catálogo. Los que no calzan se crean como ejercicios personalizados.
+- No importa las series de calentamiento, salta los entrenamientos que ya existen (misma hora de inicio) y guarda todo en una transacción.
 
 ### Seguridad de las cuentas
 
@@ -92,6 +100,7 @@ src/
   db.ts             # cliente de Prisma
   routes/           # endpoints
   catalog/          # lista de ejercicios de la app y su sincronización
+  import/           # lectura del CSV para importar historiales
   schemas/          # validaciones con Zod
   middleware/       # login requerido, límite de intentos, 404 y manejo de errores
   utils/auth.ts     # hash de contraseñas y tokens JWT
