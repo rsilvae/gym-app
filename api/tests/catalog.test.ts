@@ -132,7 +132,7 @@ describe('Rutinas con ejercicios del catálogo', () => {
       .send(
         routine([
           { name: 'jalón al pecho (cable)', targetSets: 3, targetReps: 10 }, // igual a uno del catálogo
-          { name: 'Sentadilla goblet', targetSets: 3, targetReps: 10 }, // sin el equipo, pero hay uno solo
+          { name: 'Press Arnold', targetSets: 3, targetReps: 10 }, // sin el equipo, pero hay uno solo
           { name: 'Mi ejercicio raro', targetSets: 3, targetReps: 10 }, // no existe → personalizado
         ]),
       );
@@ -140,7 +140,7 @@ describe('Rutinas con ejercicios del catálogo', () => {
     expect(response.status).toBe(201);
     const [pulldown, goblet, custom] = response.body.exercises;
     expect(pulldown.exerciseId).toBe('lat-pulldown-cable');
-    expect(goblet.exerciseId).toBe('goblet-squat');
+    expect(goblet.exerciseId).toBe('arnold-press');
     const created = await prisma.exercise.findUniqueOrThrow({ where: { id: custom.exerciseId } });
     expect(created).toMatchObject({ userId: user.id, name: 'Mi ejercicio raro', primaryMuscle: 'OTHER' });
   });

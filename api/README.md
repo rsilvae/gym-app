@@ -58,7 +58,7 @@ npm run dev               # http://localhost:3000
 
 ### Catálogo de ejercicios
 
-- La lista de la app está en [`src/catalog/exercise-catalog.ts`](src/catalog/exercise-catalog.ts) (~130 ejercicios, con id fijo). Al arrancar, la API la sincroniza con la base: agregar un ejercicio es editar ese archivo y desplegar.
+- La lista de la app está en [`src/catalog/exercise-catalog.ts`](src/catalog/exercise-catalog.ts) (~320 ejercicios, con id fijo). Al arrancar, la API la sincroniza con la base: agregar un ejercicio es editar ese archivo y desplegar.
 - Cada ejercicio de una rutina apunta al catálogo (`exerciseId`). Si llega solo el nombre (rutinas viejas o apps sin actualizar), se vincula por nombre sin importar mayúsculas ni tildes, o se crea un ejercicio personalizado.
 
 ### Seguridad de las cuentas

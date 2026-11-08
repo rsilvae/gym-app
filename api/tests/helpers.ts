@@ -26,9 +26,12 @@ export function lastCodeFor(email: string): string {
 export async function resetDatabase() {
   outbox.length = 0;
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "EmailCode", "WorkoutSet", "Workout", "RoutineExercise", "Routine", "Exercise", "User" CASCADE',
+    'TRUNCATE TABLE "EmailCode", "WorkoutSet", "Workout", "RoutineExercise", "Routine"',
   );
-  // El catálogo de la app, como al arrancar la API
+  // Borrar los usuarios también borra sus ejercicios personalizados (cascade).
+  // El catálogo global no se borra: recrearlo en cada test (~300 filas) sobrecarga la base local.
+  await prisma.user.deleteMany();
+  // Deja el catálogo igual al archivo, como al arrancar la API (si no cambió, no escribe nada)
   await syncExerciseCatalog();
 }
 
