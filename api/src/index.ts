@@ -1,5 +1,13 @@
 import { createApp } from './app.ts';
+import { linkLegacyRoutineExercises, syncExerciseCatalog } from './catalog/sync-catalog.ts';
 import { env } from './env.ts';
+
+// Antes de recibir peticiones: el catálogo de ejercicios al día y las rutinas viejas vinculadas
+const catalog = await syncExerciseCatalog();
+const legacy = await linkLegacyRoutineExercises();
+console.log(
+  `📚 Catálogo: ${catalog.created} ejercicios nuevos, ${catalog.updated} actualizados; ${legacy.linked} ejercicios de rutinas vinculados`,
+);
 
 const app = createApp();
 

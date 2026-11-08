@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
+import { ExercisePicker, exerciseSubtitle } from '@/components/exercise-picker';
 import { TextField } from '@/components/text-field';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import type { Routine, RoutineInput } from '@/types';
+import { useCatalogById } from '@/hooks/use-catalog';
+import type { CatalogExercise, Routine, RoutineInput } from '@/types';
 import { createId } from '@/utils/id';
 
 /**
@@ -15,6 +17,8 @@ import { createId } from '@/utils/id';
  */
 type ExerciseDraft = {
   id: string;
+  /** El ejercicio del catálogo. */
+  exerciseId: string | null;
   name: string;
   sets: string;
   reps: string;
@@ -32,14 +36,16 @@ type Props = {
   submitError?: string | null;
 };
 
-function emptyExercise(): ExerciseDraft {
-  return { id: createId(), name: '', sets: '3', reps: '10', weight: '' };
+/** Un ejercicio recién elegido del catálogo, con valores iniciales que luego ajustas. */
+function fromCatalog(exercise: CatalogExercise): ExerciseDraft {
+  return { id: createId(), exerciseId: exercise.id, name: exercise.name, sets: '3', reps: '10', weight: '' };
 }
 
 function toDraft(routine?: Routine): ExerciseDraft[] {
-  if (!routine) return [emptyExercise()];
+  if (!routine) return [];
   return routine.exercises.map((exercise) => ({
     id: exercise.id,
+    exerciseId: exercise.exerciseId ?? null,
     name: exercise.name,
     sets: String(exercise.targetSets),
     reps: String(exercise.targetReps),
@@ -81,16 +87,19 @@ export function RoutineForm({
   const [name, setName] = useState(initialRoutine?.name ?? '');
   const [exercises, setExercises] = useState<ExerciseDraft[]>(() => toDraft(initialRoutine));
   const [error, setError] = useState<string | null>(null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+  const catalogById = useCatalogById();
 
-  /** Cambia un solo campo de un ejercicio, sin tocar los demás. */
-  function updateExercise(id: string, field: keyof Omit<ExerciseDraft, 'id'>, value: string) {
+  /** Cambia un solo campo numérico de un ejercicio, sin tocar los demás. */
+  function updateExercise(id: string, field: 'sets' | 'reps' | 'weight', value: string) {
     setExercises((current) =>
       current.map((exercise) => (exercise.id === id ? { ...exercise, [field]: value } : exercise)),
     );
   }
 
-  function addExercise() {
-    setExercises((current) => [...current, emptyExercise()]);
+  function addExercises(picked: CatalogExercise[]) {
+    setExercises((current) => [...current, ...picked.map(fromCatalog)]);
+    setError(null);
   }
 
   function removeExercise(id: string) {
@@ -117,6 +126,7 @@ export function RoutineForm({
       name: name.trim(),
       exercises: exercises.map((exercise) => ({
         id: exercise.id,
+        exerciseId: exercise.exerciseId,
         name: exercise.name.trim(),
         targetSets: parseNumber(exercise.sets),
         targetReps: parseNumber(exercise.reps),
@@ -177,12 +187,14 @@ export function RoutineForm({
             </View>
           </View>
 
-          <TextField
-            label="Nombre"
-            placeholder="Ej: Press de banca"
-            value={exercise.name}
-            onChangeText={(text) => updateExercise(exercise.id, 'name', text)}
-          />
+          <View>
+            <ThemedText>{exercise.name}</ThemedText>
+            {exercise.exerciseId && catalogById.get(exercise.exerciseId) && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {exerciseSubtitle(catalogById.get(exercise.exerciseId)!)}
+              </ThemedText>
+            )}
+          </View>
 
           <View style={styles.numbersRow}>
             <TextField
@@ -211,7 +223,20 @@ export function RoutineForm({
         </ThemedView>
       ))}
 
-      <Button title="+ Agregar ejercicio" variant="secondary" onPress={addExercise} />
+      {exercises.length === 0 && (
+        <ThemedText type="small" themeColor="textSecondary" style={styles.empty}>
+          Todavía no hay ejercicios. Agrégalos desde el catálogo.
+        </ThemedText>
+      )}
+
+      <Button title="+ Agregar ejercicios" variant="secondary" onPress={() => setIsPickerOpen(true)} />
+
+      <ExercisePicker
+        visible={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        onAdd={addExercises}
+        alreadyAdded={new Set(exercises.flatMap((exercise) => exercise.exerciseId ?? []))}
+      />
 
       {(error ?? submitError) && (
         <ThemedText type="small" style={styles.error}>
@@ -260,6 +285,9 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#E5484D',
+    textAlign: 'center',
+  },
+  empty: {
     textAlign: 'center',
   },
 });

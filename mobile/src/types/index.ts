@@ -5,6 +5,8 @@
 /** Un ejercicio dentro de una rutina, con lo que planeas hacer. */
 export type RoutineExercise = {
   id: string;
+  /** El ejercicio del catálogo (null solo en rutinas viejas que aún no se vinculan). */
+  exerciseId?: string | null;
   name: string;
   targetSets: number; // series
   targetReps: number; // repeticiones por serie
@@ -16,6 +18,54 @@ export type Routine = {
   id: string;
   name: string;
   exercises: RoutineExercise[];
+};
+
+/** Músculo que trabaja un ejercicio (iguales al enum de la API). */
+export type MuscleGroup =
+  | 'CHEST'
+  | 'BACK'
+  | 'SHOULDERS'
+  | 'BICEPS'
+  | 'TRICEPS'
+  | 'FOREARMS'
+  | 'TRAPS'
+  | 'ABS'
+  | 'LOWER_BACK'
+  | 'QUADS'
+  | 'HAMSTRINGS'
+  | 'GLUTES'
+  | 'ADDUCTORS'
+  | 'ABDUCTORS'
+  | 'CALVES'
+  | 'FULL_BODY'
+  | 'CARDIO'
+  | 'OTHER';
+
+export type Equipment =
+  | 'BARBELL'
+  | 'EZ_BAR'
+  | 'DUMBBELL'
+  | 'MACHINE'
+  | 'SMITH'
+  | 'CABLE'
+  | 'BODYWEIGHT'
+  | 'KETTLEBELL'
+  | 'BAND'
+  | 'OTHER';
+
+/** Un ejercicio del catálogo (GET /catalog/exercises). */
+export type CatalogExercise = {
+  id: string;
+  name: string;
+  primaryMuscle: MuscleGroup;
+  secondaryMuscles: MuscleGroup[];
+  equipment: Equipment;
+  /** true = lo creaste tú; false = viene con la app. */
+  isCustom: boolean;
+};
+
+export type NewExerciseInput = Pick<CatalogExercise, 'name' | 'primaryMuscle' | 'equipment'> & {
+  secondaryMuscles?: MuscleGroup[];
 };
 
 /** El usuario que inició sesión (lo que devuelve la API, sin contraseña). */

@@ -39,6 +39,8 @@ npm run dev               # http://localhost:3000
 | POST | `/auth/change-password` 🔒 | Contraseña actual + nueva (`currentPassword`, `newPassword`) → `{ token, user }`; cierra las demás sesiones |
 | POST | `/auth/logout-all` 🔒 | Cierra la sesión en todos los dispositivos → 204 |
 | POST | `/auth/delete-account` 🔒 | Con la contraseña (`password`), borra la cuenta y todos sus datos → 204, y avisa por email |
+| GET | `/catalog/exercises` 🔒 | Catálogo: ejercicios de la app + tus personalizados (músculo principal, secundarios y equipo) |
+| POST | `/catalog/exercises` 🔒 | Crea un ejercicio personalizado (`name`, `primaryMuscle`, `equipment`); 409 con su id si ya existe |
 | GET | `/routines` 🔒 | Lista tus rutinas |
 | GET | `/routines/:id` 🔒 | Una rutina con sus ejercicios |
 | POST | `/routines` 🔒 | Crea una rutina |
@@ -53,6 +55,11 @@ npm run dev               # http://localhost:3000
 | GET | `/exercises/last?names=A&names=B` 🔒 | Series de la última vez que hiciste cada ejercicio |
 
 🔒 = requiere el header `Authorization: Bearer <token>`. Cada usuario solo ve y modifica sus propios datos (los de otro responden 404).
+
+### Catálogo de ejercicios
+
+- La lista de la app está en [`src/catalog/exercise-catalog.ts`](src/catalog/exercise-catalog.ts) (~130 ejercicios, con id fijo). Al arrancar, la API la sincroniza con la base: agregar un ejercicio es editar ese archivo y desplegar.
+- Cada ejercicio de una rutina apunta al catálogo (`exerciseId`). Si llega solo el nombre (rutinas viejas o apps sin actualizar), se vincula por nombre sin importar mayúsculas ni tildes, o se crea un ejercicio personalizado.
 
 ### Seguridad de las cuentas
 
@@ -84,6 +91,7 @@ src/
   env.ts            # valida las variables de entorno
   db.ts             # cliente de Prisma
   routes/           # endpoints
+  catalog/          # lista de ejercicios de la app y su sincronización
   schemas/          # validaciones con Zod
   middleware/       # login requerido, límite de intentos, 404 y manejo de errores
   utils/auth.ts     # hash de contraseñas y tokens JWT

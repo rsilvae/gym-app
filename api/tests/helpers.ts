@@ -1,6 +1,7 @@
 import request from 'supertest';
 
 import { createApp } from '../src/app.ts';
+import { syncExerciseCatalog } from '../src/catalog/sync-catalog.ts';
 import { prisma } from '../src/db.ts';
 import { setEmailSender, type Email } from '../src/utils/email.ts';
 
@@ -25,8 +26,10 @@ export function lastCodeFor(email: string): string {
 export async function resetDatabase() {
   outbox.length = 0;
   await prisma.$executeRawUnsafe(
-    'TRUNCATE TABLE "EmailCode", "WorkoutSet", "Workout", "RoutineExercise", "Routine", "User" CASCADE',
+    'TRUNCATE TABLE "EmailCode", "WorkoutSet", "Workout", "RoutineExercise", "Routine", "Exercise", "User" CASCADE',
   );
+  // El catálogo de la app, como al arrancar la API
+  await syncExerciseCatalog();
 }
 
 /**

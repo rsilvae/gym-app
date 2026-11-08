@@ -6,6 +6,7 @@ import { errorHandler, notFound } from './middleware/error-handler.ts';
 import { createAuthLimiters } from './middleware/rate-limit.ts';
 import { requireAuth } from './middleware/require-auth.ts';
 import { createAuthRouter } from './routes/auth.ts';
+import { catalogRouter } from './routes/catalog.ts';
 import { exercisesRouter } from './routes/exercises.ts';
 import { routinesRouter } from './routes/routines.ts';
 import { workoutsRouter } from './routes/workouts.ts';
@@ -41,6 +42,7 @@ export function createApp({ rateLimits = true }: AppOptions = {}) {
   app.use('/routines', requireAuth, routinesRouter);
   app.use('/workouts', requireAuth, workoutsRouter);
   app.use('/exercises', requireAuth, exercisesRouter);
+  app.use('/catalog', requireAuth, catalogRouter);
 
   // Siempre al final: rutas inexistentes y errores
   app.use(notFound);

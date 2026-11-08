@@ -1,5 +1,6 @@
 import { Router } from 'express';
 
+import { resolveExerciseByName } from '../catalog/sync-catalog.ts';
 import { prisma } from '../db.ts';
 import { getUserId } from '../middleware/require-auth.ts';
 import { routineInputSchema, type RoutineInput } from '../schemas/routine.ts';
@@ -26,13 +27,35 @@ const routineSelect = {
   createdAt: true,
   exercises: {
     orderBy: { order: 'asc' },
-    select: { id: true, name: true, targetSets: true, targetReps: true, targetWeight: true },
+    select: { id: true, exerciseId: true, name: true, targetSets: true, targetReps: true, targetWeight: true },
   },
 } as const;
 
-/** Convierte los ejercicios del body en filas, guardando su posición en `order`. */
-function toExerciseRows(exercises: RoutineInput['exercises']) {
-  return exercises.map((exercise, index) => ({ ...exercise, order: index }));
+/**
+ * Convierte los ejercicios del body en filas, guardando su posición en `order`
+ * y vinculando cada uno al catálogo:
+ *  - con exerciseId: tiene que ser de la app o tuyo (si no, 400), y el nombre sale del catálogo.
+ *  - sin exerciseId (versiones viejas de la app): se busca o crea por nombre.
+ */
+async function toExerciseRows(userId: string, exercises: RoutineInput['exercises']) {
+  const ids = [...new Set(exercises.flatMap((exercise) => exercise.exerciseId ?? []))];
+  const catalog = await prisma.exercise.findMany({
+    where: { id: { in: ids }, OR: [{ userId: null }, { userId }] },
+    select: { id: true, name: true },
+  });
+  const nameById = new Map(catalog.map((exercise) => [exercise.id, exercise.name]));
+
+  const rows = [];
+  for (const [index, { exerciseId, ...exercise }] of exercises.entries()) {
+    if (exerciseId) {
+      const name = nameById.get(exerciseId);
+      if (!name) throw new HttpError(400, `El ejercicio ${index + 1} no existe en el catálogo`);
+      rows.push({ ...exercise, exerciseId, name, order: index });
+    } else {
+      rows.push({ ...exercise, exerciseId: await resolveExerciseByName(userId, exercise.name), order: index });
+    }
+  }
+  return rows;
 }
 
 /** Lanza 404 si la rutina no existe o no es de este usuario. */
@@ -61,13 +84,15 @@ routinesRouter.get('/:id', async (req, res) => {
 
 routinesRouter.post('/', async (req, res) => {
   const input = validate(routineInputSchema, req.body);
+  const userId = getUserId(res.locals);
+  const exercises = await toExerciseRows(userId, input.exercises);
 
   // "Nested write": crea la rutina y sus ejercicios en una sola operación.
   const routine = await prisma.routine.create({
     data: {
-      userId: getUserId(res.locals),
+      userId,
       name: input.name,
-      exercises: { create: toExerciseRows(input.exercises) },
+      exercises: { create: exercises },
     },
     select: routineSelect,
   });
@@ -78,7 +103,9 @@ routinesRouter.post('/', async (req, res) => {
 routinesRouter.put('/:id', async (req, res) => {
   const input = validate(routineInputSchema, req.body);
   const { id } = req.params;
-  await assertOwnRoutine(id, getUserId(res.locals));
+  const userId = getUserId(res.locals);
+  await assertOwnRoutine(id, userId);
+  const exercises = await toExerciseRows(userId, input.exercises);
 
   // Borra los ejercicios anteriores y crea los nuevos. Como está dentro de
   // `update`, Prisma lo hace en una transacción: o se aplica todo o nada.
@@ -88,7 +115,7 @@ routinesRouter.put('/:id', async (req, res) => {
       name: input.name,
       exercises: {
         deleteMany: {},
-        create: toExerciseRows(input.exercises),
+        create: exercises,
       },
     },
     select: routineSelect,

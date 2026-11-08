@@ -11,6 +11,7 @@ App móvil full-stack para crear rutinas de gimnasio, registrar el peso y las re
 - 🗑️ Eliminar la cuenta desde la app (borra rutinas e historial; requisito de Apple)
 - 🛡️ Límite de intentos, headers de seguridad y respuestas que no revelan qué emails están registrados
 - 📋 Crear, editar, reordenar y eliminar rutinas
+- 🔎 Catálogo de ~130 ejercicios: buscador sin importar tildes, filtros por músculo y equipo, recientes, selección múltiple y ejercicios propios
 - ✅ Entrenamiento en curso: cronómetro, progreso y check por serie con peso y reps editables
 - 💾 El entrenamiento en curso se guarda en el celular: si la app se cierra, lo retomas donde quedaste
 - ⏱️ Temporizador de descanso automático al marcar una serie (ajustable, vibra al terminar)

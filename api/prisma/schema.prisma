@@ -26,6 +26,63 @@ model User {
   routines        Routine[]
   workouts        Workout[]
   emailCodes      EmailCode[]
+  /// Ejercicios personalizados que creó este usuario.
+  exercises       Exercise[]
+}
+
+/// Músculo que trabaja un ejercicio (para filtrar el catálogo).
+enum MuscleGroup {
+  CHEST
+  BACK
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  FOREARMS
+  TRAPS
+  ABS
+  LOWER_BACK
+  QUADS
+  HAMSTRINGS
+  GLUTES
+  ADDUCTORS
+  ABDUCTORS
+  CALVES
+  FULL_BODY
+  CARDIO
+  OTHER
+}
+
+/// Con qué se hace el ejercicio.
+enum Equipment {
+  BARBELL
+  EZ_BAR
+  DUMBBELL
+  MACHINE
+  SMITH
+  CABLE
+  BODYWEIGHT
+  KETTLEBELL
+  BAND
+  OTHER
+}
+
+/// Catálogo de ejercicios. userId null = viene con la app (lo ven todos);
+/// con userId = ejercicio personalizado de ese usuario (solo lo ve él).
+model Exercise {
+  id               String            @id @default(cuid())
+  userId           String?
+  user             User?             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name             String
+  /// Nombre en minúsculas y sin tildes: para buscar y para no repetir ejercicios.
+  normalizedName   String
+  primaryMuscle    MuscleGroup
+  secondaryMuscles MuscleGroup[]
+  equipment        Equipment
+  createdAt        DateTime          @default(now())
+  routineExercises RoutineExercise[]
+
+  @@unique([userId, normalizedName])
+  @@index([normalizedName])
 }
 
 /// Para qué sirve un código enviado por email.
@@ -67,15 +124,19 @@ model Routine {
 
 /// Un ejercicio dentro de una rutina, con su objetivo.
 model RoutineExercise {
-  id           String  @id @default(cuid())
+  id           String    @id @default(cuid())
   routineId    String
   // onDelete: Cascade → si borras la rutina, se borran sus ejercicios.
-  routine      Routine @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  routine      Routine   @relation(fields: [routineId], references: [id], onDelete: Cascade)
+  /// El ejercicio del catálogo. Opcional para no romper rutinas viejas; al arrancar, la API las vincula.
+  exerciseId   String?
+  exercise     Exercise? @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+  // Copia del nombre: el historial y el entrenamiento en curso lo usan tal cual.
   name         String
   order        Int // posición en la rutina (0, 1, 2...)
   targetSets   Int
   targetReps   Int
-  targetWeight Float   @default(0) // kg; 0 = peso corporal
+  targetWeight Float     @default(0) // kg; 0 = peso corporal
 
   @@index([routineId])
 }
