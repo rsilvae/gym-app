@@ -34,10 +34,19 @@ describe('Rutinas', () => {
         name: 'Pecho pro',
         exercises: [
           { name: 'Fondos', targetSets: 4, targetReps: 12, targetWeight: 10 },
-          { name: 'Press de banca', targetSets: 5, targetReps: 5, targetWeight: 80 },
+          {
+            name: 'Press de banca',
+            targetSets: 3,
+            targetReps: 5,
+            targetWeight: 80,
+            // Sobra un tipo (hay 3 series): se recorta
+            setTypes: ['WARMUP', 'NORMAL', 'FAILURE', 'DROPSET'],
+          },
         ],
       });
     expect(updated.status).toBe(200);
+    expect(updated.body.exercises[0].setTypes).toEqual([]); // sin tipos = todas normales
+    expect(updated.body.exercises[1].setTypes).toEqual(['WARMUP', 'NORMAL', 'FAILURE']);
     expect(updated.body.name).toBe('Pecho pro');
     expect(updated.body.exercises.map((e: { name: string }) => e.name)).toEqual(['Fondos', 'Press de banca']);
 

@@ -114,6 +114,21 @@ export default function RoutineDetailScreen() {
 /** Una fila con el ejercicio y su objetivo: series × reps y peso. */
 function ExerciseRow({ exercise, position }: { exercise: RoutineExercise; position: number }) {
   const weight = exercise.targetWeight > 0 ? `${exercise.targetWeight} kg` : 'Peso corporal';
+  // Ej: "1 calentamiento · 1 al fallo" (solo si la rutina tiene series especiales)
+  const types = exercise.setTypes?.slice(0, exercise.targetSets) ?? [];
+  const special = (
+    [
+      ['WARMUP', 'calentamiento', 'calentamiento'],
+      ['FAILURE', 'al fallo', 'al fallo'],
+      ['DROPSET', 'dropset', 'dropsets'],
+    ] as const
+  )
+    .map(([type, one, many]) => {
+      const count = types.filter((item) => item === type).length;
+      return count > 0 ? `${count} ${count === 1 ? one : many}` : null;
+    })
+    .filter(Boolean)
+    .join(' · ');
 
   return (
     <ThemedView type="backgroundElement" style={styles.row}>
@@ -125,6 +140,11 @@ function ExerciseRow({ exercise, position }: { exercise: RoutineExercise; positi
         <ThemedText type="small" themeColor="textSecondary">
           {exercise.targetSets} series × {exercise.targetReps} reps · {weight}
         </ThemedText>
+        {special !== '' && (
+          <ThemedText type="small" themeColor="textSecondary">
+            {special}
+          </ThemedText>
+        )}
       </ThemedView>
     </ThemedView>
   );

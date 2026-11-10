@@ -1,4 +1,4 @@
-import type { Routine, WorkoutInput } from '@/types';
+import type { Routine, RoutineInput, SetType, WorkoutInput } from '@/types';
 import { createId } from '@/utils/id';
 
 /**
@@ -19,6 +19,8 @@ export type ActiveSet = {
   weight: string;
   reps: string;
   completed: boolean;
+  /** Normal, calentamiento, al fallo o dropset. Puede faltar en borradores viejos (= NORMAL). */
+  type?: SetType;
   /** Objetivo de la rutina: la sugerencia cuando nunca hiciste el ejercicio. */
   targetWeight?: string;
   targetReps?: string;
@@ -46,6 +48,7 @@ function emptySets(count: number, from?: ActiveSet[]): ActiveSet[] {
     weight: '',
     reps: '',
     completed: false,
+    type: from?.[index]?.type ?? 'NORMAL',
     targetWeight: from?.[index]?.targetWeight,
     targetReps: from?.[index]?.targetReps,
   }));
@@ -65,6 +68,8 @@ export type WorkoutAction =
   /** Copia peso y reps (ej: tocar "lo de la última vez"). */
   | { type: 'FILL_SET'; exerciseId: string; setId: string; values: SetSuggestion }
   | { type: 'ADD_SET'; exerciseId: string }
+  /** Cambia el tipo de una serie (normal, calentamiento, al fallo, dropset). */
+  | { type: 'SET_TYPE'; exerciseId: string; setId: string; setType: SetType }
   | { type: 'REMOVE_SET'; exerciseId: string; setId: string }
   | { type: 'ADD_EXERCISES'; exercises: PickedExercise[] }
   | { type: 'REMOVE_EXERCISE'; exerciseId: string }
@@ -81,11 +86,12 @@ export function createWorkoutState(routine: Routine): WorkoutState {
       id: exercise.id,
       catalogId: exercise.exerciseId ?? null,
       name: exercise.name,
-      sets: Array.from({ length: exercise.targetSets }, () => ({
+      sets: Array.from({ length: exercise.targetSets }, (_, index) => ({
         id: createId(),
         weight: '',
         reps: '',
         completed: false,
+        type: exercise.setTypes?.[index] ?? 'NORMAL',
         targetWeight: exercise.targetWeight > 0 ? String(exercise.targetWeight) : '',
         targetReps: String(exercise.targetReps),
       })),
@@ -150,11 +156,18 @@ export function workoutReducer(state: WorkoutState, action: WorkoutAction): Work
           weight: last?.weight ?? '',
           reps: last?.reps ?? '',
           completed: false,
+          type: 'NORMAL',
           targetWeight: last?.targetWeight,
           targetReps: last?.targetReps,
         };
         return { ...exercise, sets: [...exercise.sets, newSet] };
       });
+
+    case 'SET_TYPE':
+      return updateExercise(state, action.exerciseId, (exercise) => ({
+        ...exercise,
+        sets: exercise.sets.map((set) => (set.id === action.setId ? { ...set, type: action.setType } : set)),
+      }));
 
     case 'REMOVE_SET':
       return updateExercise(state, action.exerciseId, (exercise) => ({
@@ -229,7 +242,11 @@ export function toWorkoutInput(state: WorkoutState, finishedAt: number): Workout
         name: exercise.name,
         sets: exercise.sets
           .filter((set) => set.completed)
-          .map((set) => ({ weight: toNumber(set.weight), reps: Math.round(toNumber(set.reps)) })),
+          .map((set) => ({
+            weight: toNumber(set.weight),
+            reps: Math.round(toNumber(set.reps)),
+            type: set.type ?? 'NORMAL',
+          })),
       }))
       .filter((exercise) => exercise.sets.length > 0),
   };
@@ -240,4 +257,61 @@ export function getProgress(state: WorkoutState) {
   const allSets = state.exercises.flatMap((exercise) => exercise.sets);
   const completed = allSets.filter((set) => set.completed).length;
   return { completed, total: allSets.length };
+}
+
+/** Reps por defecto de un ejercicio nuevo en la rutina, si no hay nada mejor. */
+const DEFAULT_TARGET_REPS = 10;
+
+/** El ejercicio de la rutina del que salió este (si sigue siendo el mismo, no uno reemplazado). */
+function originalOf(exercise: ActiveExercise, routine: Routine) {
+  const original = routine.exercises.find((item) => item.id === exercise.id);
+  return original && original.name === exercise.name ? original : undefined;
+}
+
+/**
+ * La rutina actualizada con lo que hiciste hoy: los mismos ejercicios, en el mismo orden,
+ * con la misma cantidad y tipo de series. El objetivo de reps y peso de los ejercicios
+ * que ya estaban se mantiene; los nuevos toman lo de su primera serie (si la marcaste).
+ * Los ejercicios que quedaron sin series no se guardan.
+ */
+export function toRoutineInput(state: WorkoutState, routine: Routine): RoutineInput {
+  return {
+    name: routine.name,
+    exercises: state.exercises
+      .filter((exercise) => exercise.sets.length > 0)
+      .map((exercise) => {
+        const original = originalOf(exercise, routine);
+        const firstWorking =
+          exercise.sets.find((set) => set.completed && set.type !== 'WARMUP') ??
+          exercise.sets.find((set) => set.completed);
+        const reps = Math.round(toNumber(firstWorking?.reps ?? ''));
+        return {
+          id: exercise.id,
+          exerciseId: exercise.catalogId ?? original?.exerciseId ?? null,
+          name: exercise.name,
+          targetSets: exercise.sets.length,
+          targetReps: original?.targetReps ?? (reps >= 1 ? reps : DEFAULT_TARGET_REPS),
+          targetWeight: original?.targetWeight ?? toNumber(firstWorking?.weight ?? ''),
+          setTypes: exercise.sets.map((set) => set.type ?? 'NORMAL'),
+        };
+      }),
+  };
+}
+
+/** Lo que define la "forma" de la rutina: qué ejercicios, en qué orden y qué series. */
+function structureKey(exercises: { name: string; setTypes: SetType[] }[]): string {
+  return JSON.stringify(exercises.map((exercise) => [exercise.name, exercise.setTypes]));
+}
+
+/** true si hoy cambiaste ejercicios, su orden, o la cantidad o el tipo de series respecto a la rutina. */
+export function hasRoutineChanges(state: WorkoutState, routine: Routine): boolean {
+  const before = routine.exercises.map((exercise) => ({
+    name: exercise.name,
+    setTypes: Array.from({ length: exercise.targetSets }, (_, index) => exercise.setTypes?.[index] ?? 'NORMAL'),
+  }));
+  const after = toRoutineInput(state, routine).exercises.map((exercise) => ({
+    name: exercise.name,
+    setTypes: exercise.setTypes ?? [],
+  }));
+  return after.length > 0 && structureKey(before) !== structureKey(after);
 }

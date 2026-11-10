@@ -122,6 +122,14 @@ model Routine {
   @@index([userId])
 }
 
+/// Tipo de serie: normal (con número), calentamiento (W), al fallo (F) o dropset (D).
+enum SetType {
+  NORMAL
+  WARMUP
+  FAILURE
+  DROPSET
+}
+
 /// Un ejercicio dentro de una rutina, con su objetivo.
 model RoutineExercise {
   id           String    @id @default(cuid())
@@ -137,6 +145,8 @@ model RoutineExercise {
   targetSets   Int
   targetReps   Int
   targetWeight Float     @default(0) // kg; 0 = peso corporal
+  /// Tipo de cada serie, en orden. Si faltan (rutinas viejas), son NORMAL.
+  setTypes     SetType[] @default([])
 
   @@index([routineId])
 }
@@ -169,6 +179,7 @@ model WorkoutSet {
   setNumber     Int // número de serie dentro del ejercicio (1, 2, 3...)
   weight        Float // kg
   reps          Int
+  type          SetType @default(NORMAL)
 
   @@index([workoutId])
   @@index([exerciseName])

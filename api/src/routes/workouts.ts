@@ -40,6 +40,7 @@ workoutsRouter.post('/', async (req, res) => {
       setNumber: index + 1,
       weight: set.weight,
       reps: set.reps,
+      type: set.type,
     })),
   );
 
@@ -183,21 +184,22 @@ workoutsRouter.get('/:id', async (req, res) => {
       finishedAt: true,
       sets: {
         orderBy: [{ exerciseOrder: 'asc' }, { setNumber: 'asc' }],
-        select: { exerciseName: true, exerciseOrder: true, setNumber: true, weight: true, reps: true },
+        select: { exerciseName: true, exerciseOrder: true, setNumber: true, weight: true, reps: true, type: true },
       },
     },
   });
   if (!workout) throw new HttpError(404, 'Entrenamiento no encontrado');
 
   // Agrupamos las series por ejercicio: [{ name, sets: [...] }, ...]
-  const exercises: { name: string; sets: { setNumber: number; weight: number; reps: number }[] }[] = [];
+  const exercises: { name: string; sets: { setNumber: number; weight: number; reps: number; type: string }[] }[] =
+    [];
   for (const set of workout.sets) {
     let exercise = exercises[set.exerciseOrder];
     if (!exercise) {
       exercise = { name: set.exerciseName, sets: [] };
       exercises[set.exerciseOrder] = exercise;
     }
-    exercise.sets.push({ setNumber: set.setNumber, weight: set.weight, reps: set.reps });
+    exercise.sets.push({ setNumber: set.setNumber, weight: set.weight, reps: set.reps, type: set.type });
   }
 
   const { sets: _sets, ...rest } = workout;

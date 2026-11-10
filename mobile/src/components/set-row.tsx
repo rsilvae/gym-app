@@ -2,12 +2,15 @@ import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Checkbox } from '@/components/checkbox';
 import { ThemedText } from '@/components/themed-text';
+import { SET_TYPE_COLOR, setTypeLabel } from '@/constants/set-types';
 import { Spacing } from '@/constants/theme';
 import type { ActiveSet, SetSuggestion } from '@/features/workout/workout-reducer';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
   number: number;
+  /** Lo que se ve en la columna "Serie": el número, o W / F / D según el tipo. */
+  label: string;
   set: ActiveSet;
   /** Lo que hiciste en esta serie la última vez, ej: "60 × 8". null si no hay. */
   previous: string | null;
@@ -18,6 +21,8 @@ type Props = {
   onToggle: () => void;
   /** Tocar "Anterior" copia esos valores en la serie. */
   onPressPrevious: () => void;
+  /** Tocar el número abre el menú de tipo de serie. */
+  onPressNumber: () => void;
   /** Se llama al mantener presionado el número de la serie. */
   onLongPressNumber: () => void;
 };
@@ -25,6 +30,7 @@ type Props = {
 /** Una fila: serie | anterior | kg | reps | ✓. Se pinta de color cuando está hecha. */
 export function SetRow({
   number,
+  label,
   set,
   previous,
   suggestion,
@@ -32,20 +38,28 @@ export function SetRow({
   onChangeReps,
   onToggle,
   onPressPrevious,
+  onPressNumber,
   onLongPressNumber,
 }: Props) {
   const theme = useTheme();
+  const typeColorKey = SET_TYPE_COLOR[set.type ?? 'NORMAL'];
+  const typeColor = typeColorKey ? theme[typeColorKey] : null;
   const inputStyle = [styles.input, { color: theme.text, backgroundColor: theme.background }];
 
   return (
     <View style={[styles.row, set.completed && { backgroundColor: theme.backgroundSelected }]}>
       <Pressable
+        onPress={onPressNumber}
         onLongPress={onLongPressNumber}
-        accessibilityLabel={`Serie ${number}. Mantén presionado para quitarla.`}
+        accessibilityRole="button"
+        accessibilityLabel={`Serie ${number}, ${setTypeLabel(set.type)}. Toca para cambiar el tipo; mantén presionado para quitarla.`}
+        hitSlop={4}
         style={styles.numberCell}>
-        <ThemedText type="smallBold" themeColor="textSecondary">
-          {number}
-        </ThemedText>
+        <View style={[styles.badge, typeColor && { backgroundColor: typeColor + '26' }]}>
+          <ThemedText type="smallBold" themeColor="textSecondary" style={typeColor && { color: typeColor }}>
+            {label}
+          </ThemedText>
+        </View>
       </Pressable>
 
       <Pressable
@@ -129,6 +143,13 @@ const styles = StyleSheet.create({
     width: 36,
     alignItems: 'center',
     textAlign: 'center',
+  },
+  badge: {
+    minWidth: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   previousCell: {
     flex: 1.3,

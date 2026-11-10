@@ -9,13 +9,17 @@ import { ErrorView, LoadingView } from '@/components/query-status';
 import { RestDurationField } from '@/components/rest-duration-field';
 import { RestTimerBar } from '@/components/rest-timer-bar';
 import { SetRow, SetRowHeader } from '@/components/set-row';
+import { SetTypeMenu } from '@/components/set-type-menu';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { setLabels } from '@/constants/set-types';
 import { Spacing } from '@/constants/theme';
 import {
   createWorkoutState,
   getProgress,
+  hasRoutineChanges,
   suggestionFor,
+  toRoutineInput,
   toWorkoutInput,
   workoutReducer,
   type ActiveExercise,
@@ -25,11 +29,11 @@ import {
 import { useCatalogById, useCatalogQuery } from '@/hooks/use-catalog';
 import { formatDuration, useElapsedTime } from '@/hooks/use-elapsed-time';
 import { useRestTimer, type RunningRest } from '@/hooks/use-rest-timer';
-import { useRoutineQuery } from '@/hooks/use-routines';
+import { useRoutineQuery, useUpdateRoutine } from '@/hooks/use-routines';
 import { useTheme } from '@/hooks/use-theme';
 import { useWorkoutDraft } from '@/hooks/use-workout-draft';
 import { useLastPerformanceQuery, useSaveWorkout } from '@/hooks/use-workouts';
-import type { CatalogExercise } from '@/types';
+import type { CatalogExercise, SetType } from '@/types';
 import { formatRelativeDay, formatSet } from '@/utils/format';
 import { normalizeText } from '@/utils/search';
 
@@ -103,6 +107,17 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
   }, [state, restSeconds, runningRest]);
 
   const saveWorkout = useSaveWorkout();
+  // La rutina tal como está guardada: para ver si hoy le cambiaste algo (series, ejercicios)
+  const { data: routine } = useRoutineQuery(state.routineId);
+  const updateRoutine = useUpdateRoutine(state.routineId);
+  /** El menú de tipo de serie (al tocar el número de una serie). */
+  const [typeMenu, setTypeMenu] = useState<{
+    exerciseId: string;
+    setId: string;
+    title: string;
+    current: SetType;
+    normalLabel: string;
+  } | null>(null);
   const catalog = useCatalogQuery();
   const catalogById = useCatalogById();
   /** El selector de ejercicios: para agregar, o para reemplazar uno. */
@@ -127,14 +142,30 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
   }
 
   /** Guarda en la API y, si sale bien, abre el detalle del entrenamiento guardado. */
-  function finishWorkout() {
+  /**
+   * `withRoutineUpdate`: además, guarda en la rutina los cambios de hoy (series agregadas o
+   * quitadas, su tipo, ejercicios nuevos...) para que la próxima vez arranque así.
+   */
+  function finishWorkout(withRoutineUpdate = false) {
     const finishedAt = Date.now();
     const duration = formatDuration(finishedAt - state.startedAt);
+    const routineInput = withRoutineUpdate && routine ? toRoutineInput(state, routine) : null;
 
     saveWorkout.mutate(toWorkoutInput(state, finishedAt), {
       onSuccess: ({ id }) => {
         // Ya quedó guardado en la API: el borrador del celular ya no hace falta
         void clearDraft();
+        if (routineInput) {
+          updateRoutine.mutate(routineInput, {
+            onError: (error) =>
+              Alert.alert(
+                'No se pudo actualizar la rutina',
+                `El entrenamiento sí se guardó, pero la rutina quedó como estaba.
+
+${error.message}`,
+              ),
+          });
+        }
         Alert.alert('¡Buen trabajo! 💪', `Hiciste ${completed} de ${total} series en ${duration}.`);
         // replace: "atrás" desde el detalle vuelve a la rutina, no al entrenamiento terminado
         router.replace({ pathname: '/workout-detail/[id]', params: { id } });
@@ -142,7 +173,7 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
       onError: (error) =>
         Alert.alert('No se pudo guardar', `${error.message}\n\nTu entrenamiento sigue aquí.`, [
           { text: 'Cancelar', style: 'cancel' },
-          { text: 'Reintentar', onPress: finishWorkout },
+          { text: 'Reintentar', onPress: () => finishWorkout(withRoutineUpdate) },
         ]),
     });
   }
@@ -158,9 +189,24 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
       pending > 0
         ? `Te faltan ${pending} ${pending === 1 ? 'serie' : 'series'}. ¿Terminar igual?`
         : '¿Terminar el entrenamiento?';
+    // Si cambiaste series o ejercicios, ofrecemos guardar esos cambios en la rutina
+    if (routine && hasRoutineChanges(state, routine)) {
+      Alert.alert(
+        'Terminar entrenamiento',
+        `${message}
+
+Cambiaste series o ejercicios respecto a la rutina. ¿Guardar esos cambios para la próxima vez?`,
+        [
+          { text: 'Terminar y actualizar rutina', onPress: () => finishWorkout(true) },
+          { text: 'Terminar sin cambiar la rutina', onPress: () => finishWorkout(false) },
+          { text: 'Seguir entrenando', style: 'cancel' },
+        ],
+      );
+      return;
+    }
     Alert.alert('Terminar entrenamiento', message, [
       { text: 'Seguir', style: 'cancel' },
-      { text: 'Terminar', onPress: finishWorkout },
+      { text: 'Terminar', onPress: () => finishWorkout() },
     ]);
   }
 
@@ -341,13 +387,15 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
               )}
 
               <SetRowHeader />
-              {exercise.sets.map((set, index) => {
+              {exercise.sets.map((set, index, sets) => {
+                const label = setLabels(sets.map((item) => item.type))[index];
                 const previousSet = last?.sets[index];
                 const suggestion = suggestionFor(set, index, last?.sets);
                 return (
                   <SetRow
                     key={set.id}
                     number={index + 1}
+                    label={label}
                     set={set}
                     previous={previousSet ? formatSet(previousSet) : null}
                     suggestion={suggestion}
@@ -365,6 +413,18 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
                         exerciseId: exercise.id,
                         setId: set.id,
                         values: { weight: String(previousSet.weight), reps: String(previousSet.reps) },
+                      })
+                    }
+                    onPressNumber={() =>
+                      setTypeMenu({
+                        exerciseId: exercise.id,
+                        setId: set.id,
+                        title: `Serie ${index + 1} · ${exercise.name}`,
+                        current: set.type ?? 'NORMAL',
+                        // El número que tendría si fuera normal
+                        normalLabel: setLabels(
+                          sets.map((item) => (item.id === set.id ? 'NORMAL' : item.type)),
+                        )[index],
                       })
                     }
                     onLongPressNumber={() => confirmRemoveSet(exercise, set.id, index + 1)}
@@ -392,8 +452,8 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
 
         <ThemedText type="small" themeColor="textSecondary" style={styles.hint}>
           Los números en gris son lo que hiciste la última vez: si no escribes nada, se usan al marcar la serie.
-          Toca «Anterior» para copiarlo, mantén presionado el número de una serie para quitarla y usa ••• para
-          reemplazar o eliminar un ejercicio.
+          Toca el número de una serie para marcarla como calentamiento (W), al fallo (F) o dropset (D), o para
+          quitarla. Toca «Anterior» para copiarlo y usa ••• para reemplazar o eliminar un ejercicio.
         </ThemedText>
 
         <Button
@@ -404,6 +464,21 @@ function ActiveWorkout({ initialState, initialRestSeconds, initialRest }: Active
       </ScrollView>
 
       <RestTimerBar timer={restTimer} />
+
+      <SetTypeMenu
+        visible={typeMenu !== null}
+        title={typeMenu?.title ?? ''}
+        current={typeMenu?.current ?? 'NORMAL'}
+        normalLabel={typeMenu?.normalLabel ?? '1'}
+        onClose={() => setTypeMenu(null)}
+        onSelect={(setType) =>
+          typeMenu && dispatch({ type: 'SET_TYPE', exerciseId: typeMenu.exerciseId, setId: typeMenu.setId, setType })
+        }
+        // Ya lo eligió en el menú: se quita sin otra confirmación
+        onRemove={() =>
+          typeMenu && dispatch({ type: 'REMOVE_SET', exerciseId: typeMenu.exerciseId, setId: typeMenu.setId })
+        }
+      />
 
       <ExercisePicker
         // Un key distinto por ejercicio: así el selector arranca limpio (y con "Similares") cada vez

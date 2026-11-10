@@ -10,12 +10,13 @@ import type { Routine, RoutineInput } from '@/types';
 function toRequestBody(input: RoutineInput) {
   return JSON.stringify({
     name: input.name,
-    exercises: input.exercises.map(({ exerciseId, name, targetSets, targetReps, targetWeight }) => ({
+    exercises: input.exercises.map(({ exerciseId, name, targetSets, targetReps, targetWeight, setTypes }) => ({
       exerciseId: exerciseId ?? undefined,
       name,
       targetSets,
       targetReps,
       targetWeight,
+      setTypes: setTypes ?? [],
     })),
   });
 }

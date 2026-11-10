@@ -5,8 +5,10 @@ import { Button } from '@/components/button';
 import { ErrorView, LoadingView } from '@/components/query-status';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
+import { SET_TYPE_COLOR, setLabels } from '@/constants/set-types';
 import { Spacing } from '@/constants/theme';
 import { formatDuration } from '@/hooks/use-elapsed-time';
+import { useTheme } from '@/hooks/use-theme';
 import { useDeleteWorkout, useWorkoutQuery } from '@/hooks/use-workouts';
 import { formatDate, formatNumber, formatTime } from '@/utils/format';
 
@@ -15,6 +17,7 @@ export default function WorkoutDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { data: workout, isPending, error, refetch } = useWorkoutQuery(id);
   const deleteWorkout = useDeleteWorkout();
+  const theme = useTheme();
 
   if (isPending) return <LoadingView />;
   if (error) return <ErrorView error={error} onRetry={refetch} />;
@@ -73,19 +76,27 @@ export default function WorkoutDetailScreen() {
                 Ver progreso ›
               </ThemedText>
             </Pressable>
-            {exercise.sets.map((set) => (
-              <View key={set.setNumber} style={styles.setRow}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.setNumber}>
-                  {set.setNumber}
-                </ThemedText>
-                <ThemedText type="small" style={styles.setValue}>
-                  {set.weight > 0 ? `${formatNumber(set.weight)} kg` : 'Peso corporal'}
-                </ThemedText>
-                <ThemedText type="small" style={styles.setValue}>
-                  {set.reps} reps
-                </ThemedText>
-              </View>
-            ))}
+            {exercise.sets.map((set, setIndex) => {
+              // W / F / D con su color; las normales, su número
+              const colorKey = SET_TYPE_COLOR[set.type ?? 'NORMAL'];
+              const color = colorKey ? theme[colorKey] : undefined;
+              return (
+                <View key={set.setNumber} style={styles.setRow}>
+                  <ThemedText
+                    type={color ? 'smallBold' : 'small'}
+                    themeColor="textSecondary"
+                    style={[styles.setNumber, color && { color }]}>
+                    {setLabels(exercise.sets.map((item) => item.type))[setIndex]}
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.setValue}>
+                    {set.weight > 0 ? `${formatNumber(set.weight)} kg` : 'Peso corporal'}
+                  </ThemedText>
+                  <ThemedText type="small" style={styles.setValue}>
+                    {set.reps} reps
+                  </ThemedText>
+                </View>
+              );
+            })}
           </ThemedView>
         ))}
 

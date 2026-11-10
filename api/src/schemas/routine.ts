@@ -1,5 +1,8 @@
 import { z } from 'zod';
 
+/** Tipo de serie: normal, calentamiento (W), al fallo (F) o dropset (D). */
+export const setTypeSchema = z.enum(['NORMAL', 'WARMUP', 'FAILURE', 'DROPSET']);
+
 /**
  * Reglas para validar lo que llega en el body.
  * Zod revisa los datos y, si algo no cumple, dice exactamente qué campo está mal.
@@ -11,6 +14,8 @@ export const exerciseInputSchema = z.object({
   targetSets: z.number().int().min(1).max(50),
   targetReps: z.number().int().min(1).max(500),
   targetWeight: z.number().min(0).max(2000).default(0),
+  /** Tipo de cada serie, en orden. Si faltan, son normales. */
+  setTypes: z.array(setTypeSchema).max(50).default([]),
 });
 
 export const routineInputSchema = z.object({

@@ -1,11 +1,13 @@
 import { z } from 'zod';
 
 import { isValidTimeZone } from '../utils/time-zone.ts';
+import { setTypeSchema } from './routine.ts';
 
 /** Una serie hecha: peso en kg y repeticiones. */
 const setSchema = z.object({
   weight: z.number().min(0).max(2000),
   reps: z.number().int().min(0).max(1000),
+  type: setTypeSchema.default('NORMAL'),
 });
 
 /** Un ejercicio con las series que hiciste. */

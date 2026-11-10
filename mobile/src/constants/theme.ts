@@ -15,6 +15,10 @@ export const Colors = {
     primary: '#FF6B2C',
     /** Línea de los gráficos: naranja más oscuro para que contraste con la tarjeta (≥ 3:1). */
     chart: '#D9531A',
+    /** Tipos de serie: calentamiento (W), al fallo (F) y dropset (D). */
+    warmup: '#B7791F',
+    failure: '#DC3E42',
+    dropset: '#8E4EC6',
   },
   dark: {
     text: '#ffffff',
@@ -24,6 +28,9 @@ export const Colors = {
     textSecondary: '#B0B4BA',
     primary: '#FF7E45',
     chart: '#E8692F',
+    warmup: '#FFC53D',
+    failure: '#FF6369',
+    dropset: '#BF7AF0',
   },
 } as const;
 

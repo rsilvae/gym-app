@@ -49,6 +49,7 @@ exercisesRouter.get('/', async (_req, res) => {
  *   peso × (1 + reps / 30). Sirve para comparar días con distintas reps.
  * - volume: suma de peso × reps de todas las series.
  * - maxReps: más repeticiones en una serie (útil para ejercicios sin peso, como dominadas).
+ * Las series de calentamiento (WARMUP) no cuentan: no reflejan tu fuerza.
  */
 const MAX_PROGRESS_POINTS = 100;
 
@@ -81,6 +82,7 @@ exercisesRouter.get('/progress', async (req, res) => {
     JOIN "Workout" w ON w."id" = ws."workoutId"
     WHERE w."userId" = ${userId}
       AND LOWER(ws."exerciseName") = LOWER(${name})
+      AND ws."type" <> 'WARMUP'
     GROUP BY w."id", w."finishedAt"
     ORDER BY w."finishedAt" DESC
     LIMIT ${MAX_PROGRESS_POINTS}
@@ -99,7 +101,7 @@ exercisesRouter.get('/progress', async (req, res) => {
  * GET /exercises/last?names=Press%20de%20banca&names=Sentadilla
  *
  * Para cada ejercicio, devuelve las series de la ÚLTIMA vez que lo hiciste:
- *   { "Press de banca": { finishedAt, sets: [{ weight, reps }, ...] }, ... }
+ *   { "Press de banca": { finishedAt, sets: [{ weight, reps, type }, ...] }, ... }
  * Los ejercicios que nunca hiciste no aparecen. Compara nombres sin importar mayúsculas.
  */
 exercisesRouter.get('/last', async (req, res) => {
@@ -122,7 +124,7 @@ exercisesRouter.get('/last', async (req, res) => {
       const sets = await prisma.workoutSet.findMany({
         where: { workoutId: latest.workoutId, exerciseName: nameFilter },
         orderBy: { setNumber: 'asc' },
-        select: { weight: true, reps: true },
+        select: { weight: true, reps: true, type: true },
       });
 
       return [name, { finishedAt: latest.workout.finishedAt, sets }] as const;

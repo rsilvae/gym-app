@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useCatalogById } from '@/hooks/use-catalog';
-import type { CatalogExercise, Routine, RoutineInput } from '@/types';
+import type { CatalogExercise, Routine, RoutineInput, SetType } from '@/types';
 import { createId } from '@/utils/id';
 
 /**
@@ -23,6 +23,8 @@ type ExerciseDraft = {
   sets: string;
   reps: string;
   weight: string;
+  /** Tipos de serie que vienen de la rutina (se editan durante el entrenamiento); se conservan al guardar. */
+  setTypes: SetType[];
 };
 
 type Props = {
@@ -38,7 +40,7 @@ type Props = {
 
 /** Un ejercicio recién elegido del catálogo, con valores iniciales que luego ajustas. */
 function fromCatalog(exercise: CatalogExercise): ExerciseDraft {
-  return { id: createId(), exerciseId: exercise.id, name: exercise.name, sets: '3', reps: '10', weight: '' };
+  return { id: createId(), exerciseId: exercise.id, name: exercise.name, sets: '3', reps: '10', weight: '', setTypes: [] };
 }
 
 function toDraft(routine?: Routine): ExerciseDraft[] {
@@ -50,6 +52,7 @@ function toDraft(routine?: Routine): ExerciseDraft[] {
     sets: String(exercise.targetSets),
     reps: String(exercise.targetReps),
     weight: exercise.targetWeight > 0 ? String(exercise.targetWeight) : '',
+    setTypes: exercise.setTypes ?? [],
   }));
 }
 
@@ -131,6 +134,8 @@ export function RoutineForm({
         targetSets: parseNumber(exercise.sets),
         targetReps: parseNumber(exercise.reps),
         targetWeight: exercise.weight.trim() === '' ? 0 : parseNumber(exercise.weight),
+        // Si bajaste la cantidad de series, se recortan los tipos que sobran
+        setTypes: exercise.setTypes.slice(0, parseNumber(exercise.sets)),
       })),
     });
   }

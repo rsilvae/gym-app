@@ -27,7 +27,7 @@ const routineSelect = {
   createdAt: true,
   exercises: {
     orderBy: { order: 'asc' },
-    select: { id: true, exerciseId: true, name: true, targetSets: true, targetReps: true, targetWeight: true },
+    select: { id: true, exerciseId: true, name: true, targetSets: true, targetReps: true, targetWeight: true, setTypes: true },
   },
 } as const;
 
@@ -46,7 +46,9 @@ async function toExerciseRows(userId: string, exercises: RoutineInput['exercises
   const nameById = new Map(catalog.map((exercise) => [exercise.id, exercise.name]));
 
   const rows = [];
-  for (const [index, { exerciseId, ...exercise }] of exercises.entries()) {
+  for (const [index, { exerciseId, setTypes, ...input }] of exercises.entries()) {
+    // Un tipo por serie: si sobran se recortan (no hay series extra que tipar)
+    const exercise = { ...input, setTypes: setTypes.slice(0, input.targetSets) };
     if (exerciseId) {
       const name = nameById.get(exerciseId);
       if (!name) throw new HttpError(400, `El ejercicio ${index + 1} no existe en el catálogo`);

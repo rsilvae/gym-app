@@ -2,6 +2,9 @@
  * Tipos principales de la app. Coinciden con lo que devuelve la API (ver api/README.md).
  */
 
+/** Tipo de serie: normal (con número), calentamiento (W), al fallo (F) o dropset (D). */
+export type SetType = 'NORMAL' | 'WARMUP' | 'FAILURE' | 'DROPSET';
+
 /** Un ejercicio dentro de una rutina, con lo que planeas hacer. */
 export type RoutineExercise = {
   id: string;
@@ -11,6 +14,8 @@ export type RoutineExercise = {
   targetSets: number; // series
   targetReps: number; // repeticiones por serie
   targetWeight: number; // peso en kg
+  /** Tipo de cada serie, en orden. Si faltan (rutinas viejas), son normales. */
+  setTypes?: SetType[];
 };
 
 /** Una rutina: un nombre y su lista de ejercicios. */
@@ -95,6 +100,8 @@ export type RoutineInput = Omit<Routine, 'id'>;
 export type PerformedSet = {
   weight: number;
   reps: number;
+  /** Puede faltar en datos viejos: entonces es NORMAL. */
+  type?: SetType;
 };
 
 /** Lo que se envía a la API al terminar un entrenamiento (solo las series marcadas). */
