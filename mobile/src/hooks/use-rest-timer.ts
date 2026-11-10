@@ -1,6 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
 
+import { scheduleRestEndNotification } from '@/lib/rest-notification';
 import { clampRestSeconds } from '@/utils/rest-time';
 
 /** Un descanso que está corriendo: cuándo termina y cuánto dura en total. */
@@ -48,6 +49,14 @@ export function useRestTimer({ restSeconds: initialSeconds, running }: Options) 
     }, 250);
 
     return () => clearInterval(interval);
+  }, [endsAt]);
+
+  // Notificación para cuando no estás mirando la app. Cada vez que cambia la hora de fin
+  // (empezar, ±15, saltar, terminar o salir del entrenamiento) se cancela la anterior
+  // y, si sigue habiendo descanso, se programa una nueva.
+  useEffect(() => {
+    if (endsAt === null) return;
+    return scheduleRestEndNotification(endsAt);
   }, [endsAt]);
 
   /** Empieza (o reinicia) el descanso con la duración elegida. */
